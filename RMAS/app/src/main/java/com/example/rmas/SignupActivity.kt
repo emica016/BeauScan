@@ -71,9 +71,7 @@ class SignupActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     SignupScreen(
-                        /* TODO:    Set firestore writing rule to true only to logged users and
-                         *          fill username - email collection
-                         */
+
                         onRegisterClick = { email, password, username, fullName, phoneNumber, image ->
                             FirebaseDatabase.createAccount(email, password, username, fullName, phoneNumber, image, {
                                 startActivity(Intent(this, LoginActivity::class.java))
