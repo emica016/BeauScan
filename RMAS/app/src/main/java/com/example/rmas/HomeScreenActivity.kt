@@ -35,6 +35,9 @@ class HomeScreenActivity : ComponentActivity(){
                     HomeScreen(
                         onClickButton = {
                             startActivity(Intent(this, LoginActivity::class.java))
+                        },
+                        onClickSign = {
+                            startActivity(Intent(this, SignupActivity::class.java))
                         }
                     )
                 }
@@ -44,7 +47,7 @@ class HomeScreenActivity : ComponentActivity(){
 
 }
 @Composable
-fun HomeScreen(onClickButton : ()-> Unit) {
+fun HomeScreen(onClickButton : ()-> Unit, onClickSign : () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -60,7 +63,7 @@ fun HomeScreen(onClickButton : ()-> Unit) {
 
         Button(
             onClick = {
-               onClickButton()
+                onClickButton()
             },
             modifier = Modifier.width(200.dp),
             colors = ButtonDefaults.buttonColors(Color(0xFFFDC1C5), contentColor = Color(0xFFB5485D))
@@ -75,7 +78,9 @@ fun HomeScreen(onClickButton : ()-> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = {},
+            onClick = {
+                      onClickSign()
+            },
             modifier = Modifier.width(200.dp),
             colors = ButtonDefaults.buttonColors(Color(0xFFFDC1C5), contentColor = Color(0xFFB5485D))
         ) {
@@ -92,7 +97,7 @@ fun HomeScreenPreview() {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ){
-            HomeScreen({})
+            HomeScreen({}, {})
         }
     }
 }

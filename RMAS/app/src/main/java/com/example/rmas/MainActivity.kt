@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RMASTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    //HomeScreenActivity()
+                    Text(text = "Dobrodosli u aplikaciju")
                 }
             }
         }

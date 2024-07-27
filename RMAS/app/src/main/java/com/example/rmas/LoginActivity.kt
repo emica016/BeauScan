@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -41,7 +39,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rmas.database.Firebase
+import com.example.rmas.database.FirebaseDatabase
 import com.example.rmas.ui.theme.RMASTheme
 
 
@@ -56,7 +54,7 @@ class LoginActivity : ComponentActivity() {
                 ) {
                     LoginScreen(
                         onLoginClick = { username, password ->
-                            Firebase.login(username, password, {
+                            FirebaseDatabase.login(username, password, {
                                 startActivity(Intent(this, MainActivity::class.java))
                                 finish()
                             },
@@ -121,6 +119,7 @@ fun LoginScreen(onLoginClick: (String, String) -> Unit, onChangePasswordText: ()
         OutlinedTextField(
             value = username,
             onValueChange = { username = it; invalidUsername= false },
+            singleLine = true,
             label = { Text(text = "Korisničko ime") },
             isError = invalidUsername
         )
@@ -131,6 +130,7 @@ fun LoginScreen(onLoginClick: (String, String) -> Unit, onChangePasswordText: ()
             value = password,
             onValueChange = { password = it; invalidPassword = false },
             label = { Text(text = "Lozinka") },
+            singleLine = true,
             visualTransformation = if (passwordVisible) {
                 VisualTransformation.None
             } else {
