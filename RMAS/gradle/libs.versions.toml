@@ -17,6 +17,9 @@ firebaseAuthKtx = "23.0.0"
 firebaseStorageKtx = "21.0.0"
 firebaseStorage = "21.0.0"
 firebaseAuth = "23.0.0"
+playServicesLocation = "21.3.0"
+navigationCompose = "2.7.7"
+playServicesGames = "23.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,6 +45,9 @@ firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx",
 firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebaseStorage" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+play-services-games = { group = "com.google.android.gms", name = "play-services-games", version.ref = "playServicesGames" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

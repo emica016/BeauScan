@@ -4,12 +4,15 @@ import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import com.example.rmas.data.Event
 import com.example.rmas.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.FirebaseStorage
 import java.io.ByteArrayOutputStream
+import kotlin.math.cos
 
 object FirebaseDatabase {
 
@@ -172,6 +175,14 @@ object FirebaseDatabase {
         }
     }
 
+    fun getUser(uid: String, callback: (User?) -> Unit) {
+        Firebase.firestore.collection("users").document(uid).get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                callback(document.toObject(User::class.java))
+            }
+        }
+    }
+
     fun login(
         usernameOrEmail: String,
         password: String,
@@ -227,4 +238,73 @@ object FirebaseDatabase {
             failureCallback()
         }
     }
+
+    fun getEventInfo(eventID: String, callback: (Event?) -> Unit) {
+        Firebase.firestore.collection("events").document(eventID).get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                callback(document.toObject(Event::class.java))
+            }
+        }
+    }
+
+    fun getEventsAtCurrentLocation(lat: Double, lng: Double, callback: (List<Event>) -> Unit) {
+        val radiusInKm = 0.01 // 10 meters
+        val earthRadiusKm = 6371.0
+
+        val latDelta = Math.toDegrees(radiusInKm / earthRadiusKm)
+        val lngDelta = Math.toDegrees(radiusInKm / (earthRadiusKm * cos(Math.toRadians(lat))))
+
+        val minLat = lat - latDelta
+        val maxLat = lat + latDelta
+        val minLng = lng - lngDelta
+        val maxLng = lng + lngDelta
+
+        val events = mutableListOf<Event>()
+
+        Firebase.firestore.collection("events")
+            .whereGreaterThanOrEqualTo("latitude", minLat)
+            .whereLessThanOrEqualTo("latitude", maxLat)
+            .whereGreaterThanOrEqualTo("longitude", minLng)
+            .whereLessThanOrEqualTo("longitude", maxLng)
+            .get()
+            .addOnSuccessListener {documents ->
+                for (document in documents) {
+                    events.add(document.toObject(Event::class.java))
+                }
+                callback(events)
+            }
+            .addOnFailureListener {
+                Log.e("Firebase", "getEventsAtCurrentLocation: $it", )
+            }
+    }
+    fun getCurrentUser() : String? {
+        return FirebaseAuth.getInstance().currentUser?.uid
+    }
+
+    fun setUserAttendance(eventID: String) {
+        Firebase.firestore.collection("attendance").document(eventID).collection("users").document(
+            getCurrentUser()!!).set(mapOf("attended" to true))
+    }
+
+    fun checkUserAttendance(eventID: String, callback: (Boolean) -> Unit) {
+        Firebase.firestore.collection("attendance").document(eventID).collection("users").document(
+            getCurrentUser()!!).get().addOnSuccessListener { document ->
+            if(document.exists()) {
+                callback(true)
+            } else {
+                callback(false)
+            }
+        }
+    }
+
+    fun incrementUserScore(userID: String) {
+        Firebase.firestore.collection("leaderboard").document(userID).update("score", FieldValue.increment(1))
+            .addOnFailureListener {
+                Log.e("FIREBASE", "incrementUserScore: $it", )
+                Firebase.firestore.collection("leaderboard").document(userID).set(mapOf("score" to 1)).addOnFailureListener { exception ->
+                    Log.e("FIREBASE", "setUserScore: $exception", )
+                }
+            }
+    }
 }
+
