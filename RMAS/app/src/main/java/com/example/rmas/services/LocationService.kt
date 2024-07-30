@@ -90,10 +90,10 @@ class LocationService: Service() {
                 LocationInfo.alert()
                 val lat = location.latitude.toString()
                 val long = location.longitude.toString()
-                FirebaseDatabase.getEventsAtCurrentLocation(location.latitude, location.longitude) { events ->
+                FirebaseDatabase.getPlacesAtCurrentLocation(location.latitude, location.longitude) { events ->
                     for(event in events) {
                         Log.e("LOCATION SERVICE", "start: ${event.title}", )
-                        FirebaseDatabase.checkUserAttendance(event.id) { beenThere ->
+                        FirebaseDatabase.checkUserAttendance(event.name) { beenThere ->
                             if(beenThere) {
                                 Log.e("LOCATION SERVICE", "start: already been there.", )
                             } else {
@@ -102,7 +102,7 @@ class LocationService: Service() {
                                         applicationContext,
                                         NotificationActionReceiver::class.java
                                     ).apply {
-                                        action = "like|${event.id}|${event.user}"
+                                        action = "like|${event.name}|${event.creatorID}"
                                     }
                                     val pendingLike = PendingIntent.getBroadcast(
                                         applicationContext,

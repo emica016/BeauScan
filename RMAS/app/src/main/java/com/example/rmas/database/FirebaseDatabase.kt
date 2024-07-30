@@ -4,7 +4,8 @@ import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
-import com.example.rmas.data.Event
+import com.example.rmas.data.Place
+import com.example.rmas.data.Request
 import com.example.rmas.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Firebase
@@ -239,15 +240,15 @@ object FirebaseDatabase {
         }
     }
 
-    fun getEventInfo(eventID: String, callback: (Event?) -> Unit) {
-        Firebase.firestore.collection("events").document(eventID).get().addOnSuccessListener { document ->
+    fun getPlaceInfo(eventID: String, callback: (Place?) -> Unit) {
+        Firebase.firestore.collection("places").document(eventID).get().addOnSuccessListener { document ->
             if (document.exists()) {
-                callback(document.toObject(Event::class.java))
+                callback(document.toObject(Place::class.java))
             }
         }
     }
 
-    fun getEventsAtCurrentLocation(lat: Double, lng: Double, callback: (List<Event>) -> Unit) {
+    fun getPlacesAtCurrentLocation(lat: Double, lng: Double, callback: (List<Place>) -> Unit) {
         val radiusInKm = 0.01 // 10 meters
         val earthRadiusKm = 6371.0
 
@@ -259,24 +260,49 @@ object FirebaseDatabase {
         val minLng = lng - lngDelta
         val maxLng = lng + lngDelta
 
-        val events = mutableListOf<Event>()
+        val places = mutableListOf<Place>()
 
-        Firebase.firestore.collection("events")
+        Firebase.firestore.collection("places")
             .whereGreaterThanOrEqualTo("latitude", minLat)
             .whereLessThanOrEqualTo("latitude", maxLat)
             .whereGreaterThanOrEqualTo("longitude", minLng)
             .whereLessThanOrEqualTo("longitude", maxLng)
             .get()
-            .addOnSuccessListener {documents ->
+            .addOnSuccessListener { documents ->
                 for (document in documents) {
-                    events.add(document.toObject(Event::class.java))
+                    val place = document.toObject(Place::class.java)
+                    place.type = document.getString("type")!!
+                    place.description = document.getString("description")!!
+                    place.purpose = document.getString("purpose")!!
+                    place.comments = (document.get("comments") as HashMap<String, String>?)!!
+                    place.ratingNum = document.getDouble("rating")!!.toInt()
+                    place.rating = document.getDouble("rating")!!
+                    places.add(place)
                 }
-                callback(events)
+                callback(places)
             }
             .addOnFailureListener {
                 Log.e("Firebase", "getEventsAtCurrentLocation: $it", )
             }
     }
+
+    fun getAllPlaces(callback: (List<Place>) -> Unit) {
+        val places = mutableListOf<Place>()
+        Firebase.firestore.collection("places").get().addOnSuccessListener { documents ->
+            for (document in documents) {
+                val place = document.toObject(Place::class.java)
+                place.type = document.getString("type")!!
+                place.description = document.getString("description")!!
+                place.purpose = document.getString("purpose")!!
+                place.comments = (document.get("comments") as HashMap<String, String>?)!!
+                place.ratingNum = document.getDouble("rating")!!.toInt()
+                place.rating = document.getDouble("rating")!!
+                places.add(place)
+            }
+            callback(places)
+        }
+    }
+
     fun getCurrentUser() : String? {
         return FirebaseAuth.getInstance().currentUser?.uid
     }
@@ -306,5 +332,43 @@ object FirebaseDatabase {
                 }
             }
     }
+
+    fun sendResponse(place: Place, requester: String) {
+        // Implement the logic to send the response to the requester
+        // For example, you can use Firebase Firestore to store the response
+        val responseRef = Firebase.firestore.collection("responses").document(place.name)
+        responseRef.set(mapOf("requester" to requester))
+
+    }
+
+    fun saveRequest(request: Request) {
+        Firebase.firestore.collection("requests").document(request.id).set(request)
+    }
+
+    fun getRequest(uid: String, callback: (Request?) -> Unit) {
+        Firebase.firestore.collection("requests").document(uid).get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                callback(document.toObject(Request::class.java))
+            } else {
+                callback(null)
+            }
+        }
+    }
+
+    fun getAllRequests(): List<Request> {
+        val requests = mutableListOf<Request>() // Initialize the list
+        Firebase.firestore.collection("requests").get().addOnSuccessListener { documents ->
+            for (document in documents) {
+                val request = document.toObject(Request::class.java)
+                requests.add(request) // Add each document to the list
+            }}
+            return requests // Return the list
+        }
+
+
 }
+
+
+
+
 

@@ -18,11 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat.startActivity
 import com.example.rmas.ui.theme.RMASTheme
 
 
-class HomeScreenActivity : ComponentActivity(){
+class StartActivity : ComponentActivity(){
 
     override fun onCreate(savedInstanceState: Bundle?){
         super.onCreate(savedInstanceState)
@@ -32,7 +31,7 @@ class HomeScreenActivity : ComponentActivity(){
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ){
-                    HomeScreen(
+                    StartScreen(
                         onClickButton = {
                             startActivity(Intent(this, LoginActivity::class.java))
                         },
@@ -47,7 +46,7 @@ class HomeScreenActivity : ComponentActivity(){
 
 }
 @Composable
-fun HomeScreen(onClickButton : ()-> Unit, onClickSign : () -> Unit) {
+fun StartScreen(onClickButton : ()-> Unit, onClickSign : () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -91,13 +90,13 @@ fun HomeScreen(onClickButton : ()-> Unit, onClickSign : () -> Unit) {
 
 @Preview(showBackground = true)
 @Composable
-fun HomeScreenPreview() {
+fun StartScreenPreview() {
     RMASTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ){
-            HomeScreen({}, {})
+            StartScreen({}, {})
         }
     }
 }
