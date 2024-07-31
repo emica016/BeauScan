@@ -115,7 +115,7 @@ fun CreateRequestScreen(id: String,  navHostController: NavHostController) {
                         label = {Text("Tip")},
                         trailingIcon = {ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded )},
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                        )
+                    )
                     ExposedDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false}) {
