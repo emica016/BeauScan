@@ -6,6 +6,7 @@ class Request(
     val purpose: String = "",
     val description: String = "",
     val creatorID: String = "",
+    val date : String = "",
     val numberOfResponses: Int = 0,
     val responses: List<String> = emptyList()
 )
