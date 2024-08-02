@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.navigation.NavHostController
 import com.example.rmas.data.Request
 import com.example.rmas.database.FirebaseDatabase
+import com.example.rmas.navigation.Screens
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.tasks.await
@@ -45,7 +47,7 @@ fun RequestDetails(userId: String, requestId: String, navHostController: NavHost
                         .fillMaxSize()
                         .verticalScroll(scrolState)
                 ) {
-                    ProfilHeader(requestId = requestId, containerWeight = this@BoxWithConstraints.maxHeight)
+                    ProfilHeader(requestId = requestId, navHostController,  containerWeight = this@BoxWithConstraints.maxHeight)
                 }
             }
         }
@@ -54,7 +56,7 @@ fun RequestDetails(userId: String, requestId: String, navHostController: NavHost
 
 @Composable
 private fun ProfilHeader(
-    requestId: String,
+    requestId: String, navHostController: NavHostController,
     containerWeight: Dp
 ) {
     var type by remember { mutableStateOf("") }
@@ -75,6 +77,12 @@ private fun ProfilHeader(
     Text(text = type)
     Text(text = creator)
     Text(text = description)
+    Button(onClick = {
+        navHostController.navigate(Screens.CreateRequest.screen)
+    },
+        ) {
+        Text(text = "Kreiraj pin")
+    }
 
 
 

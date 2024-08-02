@@ -16,9 +16,12 @@ import com.example.rmas.navigation.Navbar
 import com.example.rmas.services.LocationService
 import com.example.rmas.ui.theme.RMASTheme
 import android.Manifest
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -60,6 +63,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainPreview() {

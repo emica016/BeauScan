@@ -25,6 +25,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navigation
 import com.example.rmas.CreateRequestScreen
 import com.example.rmas.Profile
 import com.example.rmas.RequestDetails
@@ -96,7 +97,7 @@ fun Navbar() {
             composable("request_details/{requestId}") { backStackEntry ->
                 val requestId: String? = backStackEntry.arguments?.getString("requestId")
                 if (requestId != null) {
-                    RequestDetails(userId = getCurrentUser()!!, requestId = requestId, navHostController = navigationController)
+                    RequestDetails(userId = getCurrentUser()!!, requestId = requestId, navigationController)
                 }
             }
             composable(Screens.CreateRequest.screen){ CreateRequestScreen(
@@ -104,9 +105,16 @@ fun Navbar() {
                 navigationController
             )}
 
+
+
+
+
+            }
+
+
         }
     }
-}
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Preview

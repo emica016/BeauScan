@@ -3,7 +3,9 @@ package com.example.rmas.data
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.OverlayItem
 
-data class Place(var name: String = "",
+data class Place(
+                var id: String = "",
+                var name: String = "",
                  var type: String = PlaceType.Store.toString(),
                  var description: String="",
                  var purpose: String= PlacePurpose.Service.toString(),
@@ -22,18 +24,22 @@ data class Place(var name: String = "",
 // Enum class for Place types
 enum class PlaceType {
     Cosmetics,
-    Store
+    Hairdresser,
+    Store,
+    ParfumeStore
+
 }
 
 // Enum class for Place purposes
 enum class PlacePurpose {
+    Tretmant,
     Service,
     Shopping,
     Product_review
 }
 
 data class FilterOptions(
-    val selectedBrands: List<String>,
+    //val selectedBrands: List<String>,
     val selectedTypes: List<String>,
     val selectedPurposes: List<String>,
     val startDate: String?,
