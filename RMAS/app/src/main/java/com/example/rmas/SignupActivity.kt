@@ -7,13 +7,10 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.IconButton
@@ -27,7 +24,6 @@ import com.example.rmas.ui.theme.RMASTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,7 +47,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
@@ -72,8 +67,8 @@ class SignupActivity : ComponentActivity() {
                 ) {
                     SignupScreen(
 
-                        onRegisterClick = { email, password, username, fullName, phoneNumber, image ->
-                            FirebaseDatabase.createAccount(email, password, username, fullName, phoneNumber, image, {
+                        onRegisterClick = { email, password, username, fullName, phoneNumber, image, points ->
+                            FirebaseDatabase.createAccount(email, password, username, fullName, phoneNumber, image, points,{
                                 startActivity(Intent(this, LoginActivity::class.java))
                                 finish()
                             }) {
@@ -93,7 +88,7 @@ class SignupActivity : ComponentActivity() {
 }
 
 @Composable
-fun SignupScreen(onRegisterClick: (String, String, String, String, String, ImageBitmap) -> Unit, onLoginButton: () -> Unit) {
+fun SignupScreen(onRegisterClick: (String, String, String, String, String, ImageBitmap, Int) -> Unit, onLoginButton: () -> Unit) {
     val context = LocalContext.current.applicationContext
 
     var username by remember { mutableStateOf("") }
@@ -103,6 +98,7 @@ fun SignupScreen(onRegisterClick: (String, String, String, String, String, Image
     var passwordVisible by remember { mutableStateOf(false) }
     var phoneNumber by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri>(Uri.EMPTY) }
+    var points by remember { mutableStateOf(0) }
     val icon = if(passwordVisible)
         painterResource(id = R.drawable.visible)
     else
@@ -251,7 +247,7 @@ fun SignupScreen(onRegisterClick: (String, String, String, String, String, Image
             )
         }
         Button(
-            onClick = { onRegisterClick(email, password, username, fullName, phoneNumber, cameraService.loadImageBitmapFromUri(imageUri)) },
+            onClick = { onRegisterClick(email, password, username, fullName, phoneNumber, cameraService.loadImageBitmapFromUri(imageUri), points) },
             modifier = Modifier
                 .width(300.dp)
                 .padding(vertical = 16.dp),
@@ -299,7 +295,7 @@ fun GreetingPreview() {
     RMASTheme {
         SignupScreen(
             onLoginButton = {},
-            onRegisterClick = { _, _, _, _, _, _ ->}
+            onRegisterClick = { _, _, _, _, _, _,_ ->}
         )
     }
 }

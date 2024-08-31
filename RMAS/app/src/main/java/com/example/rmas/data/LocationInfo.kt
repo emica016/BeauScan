@@ -3,8 +3,7 @@ package com.example.rmas.data
 import android.content.Context
 import android.content.Intent
 import android.location.Location
-import android.util.Log
-import com.example.rmas.services.LocationService
+import com.example.rmas.location.LocationService
 
 object LocationInfo {
     var location: Location? = null

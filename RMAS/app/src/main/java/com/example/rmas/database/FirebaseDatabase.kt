@@ -24,6 +24,7 @@ object FirebaseDatabase {
         fullName: String,
         phoneNumber: String,
         image: ImageBitmap,
+        points: Int,
         successCallback: () -> Unit,
         failureCallback: () -> Unit
     ) {
@@ -51,6 +52,7 @@ object FirebaseDatabase {
                                             fullName,
                                             phoneNumber,
                                             image,
+                                            points,
                                             successCallback,
                                             failureCallback
                                         )
@@ -80,6 +82,7 @@ object FirebaseDatabase {
         fullName: String,
         phoneNumber: String,
         image: ImageBitmap,
+        points: Int,
         successCallback: () -> Unit,
         failureCallback: () -> Unit
     ) {
@@ -91,7 +94,7 @@ object FirebaseDatabase {
             )
         ).addOnSuccessListener {
             Log.d("UsernameToPassword", "SUCCESSFUL")
-            uploadImageToFirestore(email, username, fullName, phoneNumber, image, successCallback, failureCallback)
+            uploadImageToFirestore(email, username, fullName, phoneNumber, image, points, successCallback, failureCallback)
         }.addOnFailureListener {// Revert registration process if anything fails
             // Delete account if bind fails
             auth.currentUser!!.delete()
@@ -105,6 +108,7 @@ object FirebaseDatabase {
         fullName: String,
         phoneNumber: String,
         image: ImageBitmap,
+        points: Int,
         successCallback: () -> Unit,
         failureCallback: () -> Unit
     ) {
@@ -126,6 +130,7 @@ object FirebaseDatabase {
                         fullName,
                         phoneNumber,
                         downloadUrl,
+                        points,
                         successCallback,
                         failureCallback
                     )
@@ -148,6 +153,7 @@ object FirebaseDatabase {
         fullName: String,
         phoneNumber: String,
         profilePictureURL: String,
+        points: Int,
         successCallback: () -> Unit,
         failureCallback: () -> Unit
     ) {
@@ -160,6 +166,7 @@ object FirebaseDatabase {
         user.fullName = fullName
         user.phoneNumber = phoneNumber
         user.image = profilePictureURL
+        user.points = points
         Firebase.firestore.collection("users").document(auth.currentUser!!.uid).set(user)
             .addOnSuccessListener {
                 Log.d("writeAdditionalData", "SUCCESSFUL")

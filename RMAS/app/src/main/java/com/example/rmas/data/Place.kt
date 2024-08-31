@@ -1,24 +1,25 @@
 package com.example.rmas.data
 
-import org.osmdroid.util.GeoPoint
+//import org.osmdroid.util.GeoPoint
+import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.GeoPoint
 import org.osmdroid.views.overlay.OverlayItem
 
 data class Place(
-                var id: String = "",
-                var name: String = "",
-                 var type: String = PlaceType.Store.toString(),
-                 var description: String="",
-                 var purpose: String= PlacePurpose.Service.toString(),
-                 var creatorID: String?="",
-                 var lastVisitedID: String?="",
-                 var longitude: Double=0.0,
-                 var latitude: Double=0.0,
-                 var dateCreated: String="",
-                 var timeCreated : String="",
-                 var comments: HashMap<String,String> = HashMap(),
-                 var ratingNum: Int = 0,
-                 var rating: Double=0.0
-) : OverlayItem(name, description, GeoPoint(latitude, longitude))
+    @DocumentId var id: String = "",
+    var name: String = "",
+    var type: String = PlaceType.Store.toString(),
+    var description: String="",
+    var purpose: String= PlacePurpose.Service.toString(),
+    var creatorID: String?="",
+    var location: GeoPoint = GeoPoint(0.0,0.0),
+    var dateCreated: String="",
+    var timeCreated : String="",
+    var comments: HashMap<String,String> = HashMap(),
+    var ratingNum: Int = 0,
+    var rating: Double=0.0,
+    var imageUrl: String? = null
+)
 
 
 // Enum class for Place types
@@ -32,7 +33,7 @@ enum class PlaceType {
 
 // Enum class for Place purposes
 enum class PlacePurpose {
-    Tretmant,
+    Treatmant,
     Service,
     Shopping,
     Product_review

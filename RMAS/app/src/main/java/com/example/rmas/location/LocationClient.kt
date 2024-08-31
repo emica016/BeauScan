@@ -1,4 +1,4 @@
-package com.example.rmas.data
+package com.example.rmas.location
 
 import android.location.Location
 import kotlinx.coroutines.flow.Flow
