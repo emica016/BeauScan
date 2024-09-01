@@ -46,15 +46,14 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-//TREBA DA SE CUVA placeId u response, DA SE PODESI KAMERA
+// TREBA DA SE CUVA placeId u response, DA SE PODESI KAMERA
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
+fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostController) {
     val context = LocalContext.current
     val placeRepository = remember { PlaceRepository(context) }
     val coroutineScope = rememberCoroutineScope()
@@ -70,6 +69,9 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
 
     var showAddPlaceDialog by remember { mutableStateOf<Pair<LatLng, Boolean>?>(null) }
     var showAddResponseDialog by remember { mutableStateOf<Pair<Place?, Boolean>?>(null) }
+
+    // Marker za trenutnu lokaciju
+    var currentLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
     // Request location permission
     LaunchedEffect(Unit) {
@@ -87,9 +89,25 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
                     getMapAsync { map ->
                         googleMap = map
                         map.isMyLocationEnabled = true
+                        map.uiSettings.isZoomControlsEnabled = true
+
+                        // Postavljanje plavog markera za trenutnu lokaciju
+                        currentLocation.value?.let { location ->
+                            // Ako marker već postoji, ukloni ga
+                            currentLocationMarker?.remove()
+
+                            // Dodaj novi marker sa plavom bojom
+                            currentLocationMarker = map.addMarker(
+                                MarkerOptions()
+                                    .position(location)
+                                    .title("Moja Lokacija")
+                                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
+                            )
+                        }
+
                         map.setOnMapLoadedCallback {
                             coroutineScope.launch {
-                                fetchPlaces(placeRepository, places, placeMarkers, googleMap)
+                                fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
                             }
                         }
                         map.setOnMapClickListener { latLng ->
@@ -111,6 +129,17 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
                     googleMap = map
                     currentLocation.value?.let {
                         map.moveCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
+
+                        // Ako marker već postoji, ukloni ga
+                        currentLocationMarker?.remove()
+
+                        // Dodaj novi marker sa plavom bojom
+                        currentLocationMarker = map.addMarker(
+                            MarkerOptions()
+                                .position(it)
+                                .title("Moja Lokacija")
+                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
+                        )
                     }
                 }
             }
@@ -125,6 +154,20 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
                         val latLng = LatLng(it.latitude, it.longitude)
                         currentLocation.value = latLng
                         googleMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+
+                        // Dodavanje plavog markera za trenutnu lokaciju
+                        googleMap?.let { map ->
+                            // Ako marker već postoji, ukloni ga
+                            currentLocationMarker?.remove()
+
+                            // Dodaj novi marker sa plavom bojom
+                            currentLocationMarker = map.addMarker(
+                                MarkerOptions()
+                                    .position(latLng)
+                                    .title("Moja Lokacija")
+                                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
+                            )
+                        }
                     }
                 }
             }
@@ -135,15 +178,15 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("Location permission is required to use this feature")
+            Text("Lokaciona dozvola je potrebna za korišćenje ove funkcije")
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = { locationPermissionState.launchPermissionRequest() }) {
-                Text("Request Permission")
+                Text("Zatraži Dozvolu")
             }
         }
     }
 
-    // Show dialogs
+    // Prikazivanje dijaloga
     showAddPlaceDialog?.let { (latLng, showDialog) ->
         if (showDialog) {
             ShowAddPlaceDialog(
@@ -152,12 +195,12 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
                 coroutineScope = coroutineScope,
                 onPlaceSaved = { place ->
                     if (requestId != null) {
-                        // Show dialog to add response
+                        // Prikazivanje dijaloga za dodavanje odgovora
                         showAddResponseDialog = place to true
                     } else {
-                        // Refresh places and dismiss dialog
+                        // Osvježavanje mesta i zatvaranje dijaloga
                         coroutineScope.launch {
-                            fetchPlaces(placeRepository, places, placeMarkers, googleMap)
+                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
                         }
                         showAddPlaceDialog = null
                     }
@@ -175,14 +218,14 @@ fun MapScreen(requestId: String? = null, navHostController: NavHostController) {
                 placeRepository = placeRepository,
                 onResponseSaved = {
                     coroutineScope.launch {
-                        fetchPlaces(placeRepository, places, placeMarkers, googleMap)
+                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
                     }
                     showAddResponseDialog = null
-                    showAddPlaceDialog = null // Close the place dialog too
+                    showAddPlaceDialog = null // Zatvaranje dijaloga za dodavanje mesta takođe
                 },
                 onDismiss = {
                     showAddResponseDialog = null
-                    showAddPlaceDialog = null // Close the place dialog too
+                    showAddPlaceDialog = null // Zatvaranje dijaloga za dodavanje mesta takođe
                 }
             )
         }
@@ -199,7 +242,8 @@ private fun fetchPlaces(
     placeRepository: PlaceRepository,
     places: SnapshotStateList<Place>,
     placeMarkers: MutableMap<String, Marker?>,
-    googleMap: GoogleMap?
+    googleMap: GoogleMap?,
+    selectedPlaceId: String?
 ) {
     placeRepository.getAllPlaces().get().addOnSuccessListener { result ->
         places.clear()
@@ -210,17 +254,20 @@ private fun fetchPlaces(
             val place = document.toObject(Place::class.java)
             places.add(place)
             val position = LatLng(place.location.latitude, place.location.longitude)
-            val marker = googleMap?.addMarker(
-                MarkerOptions().position(position).title(place.name)
-            )
-            marker?.let {
-                placeMarkers[place.id] = it
-            }
+            val markerOptions = MarkerOptions().position(position).title(place.name)
+
+            // Ako je ID mesta isti kao prosleđeni placeId, postavi marker u zelenoj boji
+            val markerColor = if (place.id == selectedPlaceId) BitmapDescriptorFactory.HUE_GREEN else BitmapDescriptorFactory.HUE_RED
+            markerOptions.icon(BitmapDescriptorFactory.defaultMarker(markerColor))
+
+            val marker = googleMap?.addMarker(markerOptions)
+            placeMarkers[place.id] = marker
         }
-    }.addOnFailureListener { e ->
-        Log.e("MapsScreen", "Error fetching places", e)
+    }.addOnFailureListener { exception ->
+        Log.e("MapScreen", "Error fetching places: ${exception.message}")
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -255,7 +302,7 @@ fun ShowAddPlaceDialog(
         }
     }
 
-    // Create a temporary URI for the camera
+    // Kreiranje privremene URI za kameru
     val createImageUri: () -> Uri = {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "temp_image.jpg")
@@ -264,41 +311,17 @@ fun ShowAddPlaceDialog(
         context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
     }
 
-    // Image capture and selection logic
-    Row {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_gallery),
-            contentDescription = null,
-            modifier = Modifier
-                .size(50.dp)
-                .clickable { imagePickerLauncher.launch("image/*") }
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Icon(
-            painter = painterResource(id = R.drawable.ic_camera),
-            contentDescription = null,
-            modifier = Modifier
-                .size(50.dp)
-                .clickable {
-                    cameraUri.value = createImageUri()
-                    cameraUri.value?.let { uri ->
-                        takePictureLauncher.launch(uri)
-                    }
-                }
-        )
-    }
-
     AlertDialog(
         onDismissRequest = {
             onDismiss()
         },
-        title = { Text("Add Place") },
+        title = { Text("Dodaj Mesto") },
         text = {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Image preview
+                // Pregled slike
                 Surface(
                     modifier = Modifier
                         .size(150.dp)
@@ -315,8 +338,11 @@ fun ShowAddPlaceDialog(
                     }
                 }
 
-                // Image selection
-                Row {
+                // Odabir slike
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_gallery),
                         contentDescription = null,
@@ -338,26 +364,26 @@ fun ShowAddPlaceDialog(
                             }
                     )
                 }
-                // Input fields
+                // Unos podataka o mestu
                 OutlinedTextField(
                     value = placeName,
                     onValueChange = { placeName = it },
-                    label = { Text("Place Name") }
+                    label = { Text("Naziv Mesta") }
                 )
                 OutlinedTextField(
                     value = placeType,
                     onValueChange = { placeType = it },
-                    label = { Text("Place Type") }
+                    label = { Text("Tip Mesta") }
                 )
                 OutlinedTextField(
                     value = placePurpose,
                     onValueChange = { placePurpose = it },
-                    label = { Text("Place Purpose") }
+                    label = { Text("Svrha Mesta") }
                 )
                 OutlinedTextField(
                     value = placeDescription,
                     onValueChange = { placeDescription = it },
-                    label = { Text("Place Description") }
+                    label = { Text("Opis Mesta") }
                 )
             }
         },
@@ -375,19 +401,19 @@ fun ShowAddPlaceDialog(
                     creatorID = currentUser,
                     dateCreated = dateFormatter.format(currentDate),
                     timeCreated = timeFormatter.format(currentDate),
-                    imageUrl = imageUri?.toString()  // Store image URL if available
+                    imageUrl = imageUri?.toString()  // Čuvanje URL slike ako je dostupna
                 )
                 placeRepository.savePlace(place)
-                onPlaceSaved(place) // Notify that the place has been saved
+                onPlaceSaved(place) // Obaveštavanje da je mesto sačuvano
             }) {
-                Text("Add Place")
+                Text("Dodaj Mesto")
             }
         },
         dismissButton = {
             Button(onClick = {
                 onDismiss()
             }) {
-                Text("Cancel")
+                Text("Otkaži")
             }
         }
     )
@@ -412,17 +438,17 @@ fun AddResponseDialog(
         onDismissRequest = {
             onDismiss()
         },
-        title = { Text("Add Response") },
+        title = { Text("Dodaj Odgovor") },
         text = {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Place: ${place?.name ?: "Unknown"}")
+                Text("Mesto: ${place?.name ?: "Nepoznato"}")
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Comment") }
+                    label = { Text("Komentar") }
                 )
             }
         },
@@ -442,14 +468,14 @@ fun AddResponseDialog(
                 onResponseSaved()
                 onDismiss()
             }) {
-                Text("Save Response")
+                Text("Sačuvaj Odgovor")
             }
         },
         dismissButton = {
             Button(onClick = {
                 onDismiss()
             }) {
-                Text("Cancel")
+                Text("Otkaži")
             }
         }
     )
@@ -485,13 +511,13 @@ private fun showPlaceDetails(placeId: String, placeRepository: PlaceRepository, 
                             contentScale = ContentScale.Crop
                         )
                     }
-                    Text("Type: ${it.type}")
-                    Text("Purpose: ${it.purpose}")
-                    Text("Description: ${it.description}")
-                    Text("Location: ${it.location.latitude}, ${it.location.longitude}")
-                    Text("Creator: ${it.creatorID}")
-                    Text("Date Created: ${it.dateCreated}")
-                    Text("Time Created: ${it.timeCreated}")
+                    Text("Tip: ${it.type}")
+                    Text("Svrha: ${it.purpose}")
+                    Text("Opis: ${it.description}")
+                    Text("Lokacija: ${it.location.latitude}, ${it.location.longitude}")
+                    Text("Kreator: ${it.creatorID}")
+                    Text("Datum Kreiranja: ${it.dateCreated}")
+                    Text("Vreme Kreiranja: ${it.timeCreated}")
                 }
             },
             confirmButton = {

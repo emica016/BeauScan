@@ -150,6 +150,19 @@ class PlaceRepository(private val context: Context) {
             }
     }
 
+    fun getPlacesByCreator(creatorEmail: String, onSuccess: (List<Place>) -> Unit) {
+        db.collection("places")
+            .whereEqualTo("creatorID", creatorEmail)
+            .get()
+            .addOnSuccessListener { result ->
+                val places = result.map { it.toObject(Place::class.java) }
+                onSuccess(places)
+            }
+            .addOnFailureListener { e ->
+                Log.e("PlaceRepository", "Error fetching places", e)
+                onSuccess(emptyList())
+            }
+    }
 
 
 }

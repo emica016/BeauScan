@@ -191,6 +191,24 @@ object FirebaseDatabase {
         }
     }
 
+    fun updateUser(id: String, fullName: String, phoneNumber: String, image: String, onComplete: (Boolean) -> Unit) {
+        val userRef = Firebase.firestore.collection("users").document(id)
+
+        val updates = hashMapOf<String, Any>(
+            "fullName" to fullName,
+            "phoneNumber" to phoneNumber,
+            "image" to image
+        )
+
+        userRef.update(updates)
+            .addOnSuccessListener {
+                onComplete(true)
+            }
+            .addOnFailureListener { exception ->
+                exception.printStackTrace()
+                onComplete(false)
+            }
+    }
     fun login(
         usernameOrEmail: String,
         password: String,

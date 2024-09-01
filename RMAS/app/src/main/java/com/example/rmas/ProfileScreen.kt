@@ -1,34 +1,17 @@
 package com.example.rmas
 
-
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,218 +27,147 @@ import com.example.rmas.data.LocationInfo
 import com.example.rmas.database.FirebaseDatabase
 import com.example.rmas.database.FirebaseDatabase.getUser
 import com.example.rmas.ui.theme.RMASTheme
-import java.security.AllPermission
 
 @Composable
-fun Profile(id: String){
+fun Profile(id: String) {
     var username by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var image by remember { mutableStateOf("") }
+    var isEditing by remember { mutableStateOf(false) }
 
-    Log.e("USER1", id)
-    getUser(id){
-        if(it !=null){
+    val context = LocalContext.current
+
+    // Load user data
+    getUser(id) {
+        if (it != null) {
             email = it.email
-            username= it.username
+            username = it.username
             fullName = it.fullName
             phoneNumber = it.phoneNumber
             image = it.image
         }
-        
     }
-    
-    Log.e("USER", username)
-    
+
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(0.dp, 16.dp),
-        verticalArrangement = Arrangement.Center,
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
+    ) {
+        // Profile Image
         Surface(
             modifier = Modifier
-                .size(200.dp)
-                .clip(CircleShape)
-                .border(
-                    width = 3.dp,
-                    color = Color(0xFFB5485D),
-                    shape = CircleShape
-                )
-        ){
+                .size(120.dp)
+                .clip(RoundedCornerShape(60.dp))
+                .border(BorderStroke(2.dp, Color(0xFFB5485D)), RoundedCornerShape(60.dp)),
+            color = Color.Gray
+        ) {
             AsyncImage(
-                model = image, 
+                model = image,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
         }
-        
-        Spacer(modifier = Modifier.height(100.dp))
-        
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp, 24.dp)
-        ){
-            Row(
-                modifier = Modifier.padding(24.dp, 0.dp),
-                horizontalArrangement = Arrangement.Start
-            ){
-                Icon(
-                    modifier = Modifier
-                        .padding(16.dp, 0.dp)
-                        .size(26.dp),
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null
-                )
-            }
-            
-            Row(
-                horizontalArrangement = Arrangement.Start
-            ){
-                Text(text = fullName)
-            }
-        }
 
-        Divider(
-            modifier = Modifier.width(250.dp),
-            color = Color(0xFFB5485D),
-            thickness = 1.dp
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = fullName,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp, 24.dp)
+        Spacer(modifier = Modifier.height(8.dp))
 
-        ){
+        // User Info
+        ProfileInfo(icon = Icons.Default.Person, info = username)
+        ProfileInfo(icon = Icons.Default.Email, info = email)
+        ProfileInfo(icon = Icons.Default.Phone, info = phoneNumber)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Location Service Toggle
+        if (FirebaseDatabase.getCurrentUser() == id) {
+            var location by remember { mutableStateOf(LocationInfo.locationServiceStatus) }
+
             Row(
-                modifier = Modifier.padding(24.dp, 0.dp),
-                horizontalArrangement = Arrangement.Start
-            ){
-                Icon(
-                    modifier = Modifier
-                        .padding(16.dp, 0.dp)
-                        .size(26.dp),
-                    imageVector = Icons.Default.Email,
-                    contentDescription = null
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.Start
-            ){
-                Text(text = email)
-            }
-
-
-        }
-
-        Divider(
-            modifier = Modifier.width(250.dp),
-            color = Color(0xFFB5485D),
-            thickness = 1.dp
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp, 24.dp)
-
-        ){
-            Row(
-                modifier = Modifier.padding(24.dp, 0.dp),
-                horizontalArrangement = Arrangement.Start
-            ){
-                Icon(
-                    modifier = Modifier
-                        .padding(16.dp, 0.dp)
-                        .size(26.dp),
-                    painter = painterResource(id = R.drawable.username),
-                    contentDescription = null
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.Start
-            ){
-                Text(text = username)
-            }
-
-
-        }
-        Divider(
-            modifier = Modifier.width(250.dp),
-            color = Color(0xFFB5485D),
-            thickness = 1.dp
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp, 24.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(24.dp, 0.dp),
-                horizontalArrangement = Arrangement.Start
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clip(RoundedCornerShape(8.dp))
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    modifier = Modifier
-                        .padding(16.dp, 0.dp)
-                        .size(26.dp),
-                    imageVector = Icons.Default.Phone,
-                    contentDescription = null,
+                Text(
+                    text = "Enable Location Service:",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Checkbox(
+                    checked = location,
+                    onCheckedChange = {
+                        location = it
+                        if (location) {
+                            LocationInfo.enableLocation(context)
+                        } else {
+                            LocationInfo.disableLocation(context)
+                        }
+                    }
                 )
             }
-            Row(
-                horizontalArrangement = Arrangement.Start
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Change Profile Image Button
+            Button(
+                onClick = { isEditing = !isEditing },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text(text = phoneNumber)
+                Text("Change Profile Image")
             }
-        }
-        Divider(
-            modifier = Modifier.width(250.dp),
-            color = Color(0xFFB5485D),
-            thickness = 1.dp
-        )
 
-
-    }
-
-    var location by remember { mutableStateOf(LocationInfo.locationServiceStatus) }
-    val context = LocalContext.current
-
-    if(FirebaseDatabase.getCurrentUser() == id){
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Bottom,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ){
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ){
-                Text("Pokreni servis za lokaciju: ")
-                Checkbox(checked = location, onCheckedChange = {
-                    location = it
-                    if(location){
-                        LocationInfo.enableLocation(context)
-
-                    }
-                    else{
-                        LocationInfo.disableLocation(context)
-                    }
-                })
-            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
-
 }
 
-@Preview
 @Composable
-fun PreviewProfile()
-{
+fun ProfileInfo(icon: ImageVector, info: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Text(
+            text = info,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewProfile() {
     RMASTheme {
         Profile("")
     }
