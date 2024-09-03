@@ -5,7 +5,7 @@ sealed class Screens(val screen: String) {
 
 
     data object CreateRequest:Screens("create_request")
-    data object Leaderboard: Screens("leaderboard")
+    data object LeaderboardScreen: Screens("leaderboard")
     data object Profile: Screens("profile")
     data object MapScreen: Screens("map")
 

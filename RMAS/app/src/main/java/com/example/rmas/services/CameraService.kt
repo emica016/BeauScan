@@ -15,10 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.FileProvider
+import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Objects
+import java.util.UUID
 
 
 class CameraService(private val context: Context) {
@@ -79,5 +82,27 @@ class CameraService(private val context: Context) {
         val source = ImageDecoder.createSource(context.contentResolver, uri)
         val bitmap = ImageDecoder.decodeBitmap(source)
         return bitmap.asImageBitmap()
+    }
+}
+
+suspend fun uploadImageToStorage(imageUri: Uri, context: Context): String? {
+    // Referenca na Firebase Storage
+    val storage = FirebaseStorage.getInstance()
+    val storageRef = storage.reference
+
+    // Kreirajte jedinstveno ime za sliku
+    val imageRef = storageRef.child("images/${UUID.randomUUID()}.jpg")
+
+    return try {
+        // Učitajte sliku na Firebase Storage
+        val uploadTask = imageRef.putFile(imageUri).await()
+
+        // Kada je učitavanje uspešno, dobijte URL slike
+        val downloadUrl = imageRef.downloadUrl.await()
+        downloadUrl.toString()
+    } catch (e: Exception) {
+        // Obradite greške
+        Log.e("UploadImage", "Upload failed", e)
+        null
     }
 }

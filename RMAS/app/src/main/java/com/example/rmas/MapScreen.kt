@@ -2,18 +2,19 @@ package com.example.rmas
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -23,12 +24,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import coil.compose.rememberImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
@@ -38,20 +39,25 @@ import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.GeoPoint
-import com.google.firebase.storage.FirebaseStorage
 import com.example.rmas.data.Place
 import com.example.rmas.data.PlaceRepository
+import com.example.rmas.data.Request
+import com.example.rmas.data.Response
+import com.example.rmas.services.uploadImageToStorage
 import com.google.accompanist.permissions.isGranted
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
-// TREBA DA SE CUVA placeId u response, DA SE PODESI KAMERA
-@OptIn(ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostController) {
     val context = LocalContext.current
@@ -63,6 +69,7 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
     val places = remember { mutableStateListOf<Place>() }
     val selectedPlaceId = remember { mutableStateOf<String?>(null) }
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    var selectedType by remember { mutableStateOf<String?>(null) }
 
     val mapProperties = remember { MapProperties(isMyLocationEnabled = true) }
     val mapUiSettings = remember { MapUiSettings(zoomControlsEnabled = true) }
@@ -70,10 +77,14 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
     var showAddPlaceDialog by remember { mutableStateOf<Pair<LatLng, Boolean>?>(null) }
     var showAddResponseDialog by remember { mutableStateOf<Pair<Place?, Boolean>?>(null) }
 
-    // Marker za trenutnu lokaciju
     var currentLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
-    // Request location permission
+    LaunchedEffect(selectedType) {
+        if (googleMap != null) {
+            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (!locationPermissionState.status.isGranted) {
             locationPermissionState.launchPermissionRequest()
@@ -81,71 +92,76 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
     }
 
     if (locationPermissionState.status.isGranted) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                MapView(context).apply {
-                    onCreate(Bundle())
-                    getMapAsync { map ->
-                        googleMap = map
-                        map.isMyLocationEnabled = true
-                        map.uiSettings.isZoomControlsEnabled = true
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f)) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        MapView(context).apply {
+                            onCreate(Bundle())
+                            getMapAsync { map ->
+                                googleMap = map
+                                map.isMyLocationEnabled = true
+                                map.uiSettings.isZoomControlsEnabled = true
 
-                        // Postavljanje plavog markera za trenutnu lokaciju
-                        currentLocation.value?.let { location ->
-                            // Ako marker već postoji, ukloni ga
-                            currentLocationMarker?.remove()
-
-                            // Dodaj novi marker sa plavom bojom
-                            currentLocationMarker = map.addMarker(
-                                MarkerOptions()
-                                    .position(location)
-                                    .title("Moja Lokacija")
-                                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
-                            )
-                        }
-
-                        map.setOnMapLoadedCallback {
-                            coroutineScope.launch {
-                                fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
+                                map.setOnMapLoadedCallback {
+                                    coroutineScope.launch {
+                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+                                    }
+                                }
+                                map.setOnMapClickListener { latLng ->
+                                    currentLocation.value = latLng
+                                    showAddPlaceDialog = latLng to true
+                                }
+                                map.setOnMarkerClickListener { marker ->
+                                    marker.title?.let { title ->
+                                        val place = places.find { it.name == title }
+                                        selectedPlaceId.value = place?.id
+                                    }
+                                    true
+                                }
                             }
                         }
-                        map.setOnMapClickListener { latLng ->
-                            currentLocation.value = latLng
-                            showAddPlaceDialog = latLng to true
-                        }
-                        map.setOnMarkerClickListener { marker ->
-                            marker.title?.let { title ->
-                                val place = places.find { it.name == title }
-                                selectedPlaceId.value = place?.id
-                            }
-                            true
-                        }
                     }
-                }
-            },
-            update = { mapView ->
-                mapView.getMapAsync { map ->
-                    googleMap = map
-                    currentLocation.value?.let {
-                        map.moveCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
-
-                        // Ako marker već postoji, ukloni ga
-                        currentLocationMarker?.remove()
-
-                        // Dodaj novi marker sa plavom bojom
-                        currentLocationMarker = map.addMarker(
-                            MarkerOptions()
-                                .position(it)
-                                .title("Moja Lokacija")
-                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
-                        )
-                    }
-                }
+                )
             }
-        )
 
-        // Obtain current location
+            // Filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedType == null,
+                    onClick = { selectedType = null },
+                    label = { Text("Svi Tipovi") }
+                )
+                FilterChip(
+                    selected = selectedType == "Frizerski salon",
+                    onClick = { selectedType = "Frizerski salon" },
+                    label = { Text("Frizerski salon") }
+                )
+                FilterChip(
+                    selected = selectedType == "Kozmeticki salon",
+                    onClick = { selectedType = "Kozmeticki salon" },
+                    label = { Text("Kozmeticki salon") }
+                )
+                FilterChip(
+                    selected = selectedType == "Parfimerija",
+                    onClick = { selectedType = "Parfimerija" },
+                    label = { Text("Parfimerija") }
+                )
+                FilterChip(
+                    selected = selectedType == "Drogerija",
+                    onClick = { selectedType = "Drogerija" },
+                    label = { Text("Drogerija") }
+                )
+            }
+        }
+
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
         LaunchedEffect(Unit) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -154,13 +170,8 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
                         val latLng = LatLng(it.latitude, it.longitude)
                         currentLocation.value = latLng
                         googleMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
-
-                        // Dodavanje plavog markera za trenutnu lokaciju
                         googleMap?.let { map ->
-                            // Ako marker već postoji, ukloni ga
                             currentLocationMarker?.remove()
-
-                            // Dodaj novi marker sa plavom bojom
                             currentLocationMarker = map.addMarker(
                                 MarkerOptions()
                                     .position(latLng)
@@ -186,48 +197,44 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
         }
     }
 
-    // Prikazivanje dijaloga
-    showAddPlaceDialog?.let { (latLng, showDialog) ->
-        if (showDialog) {
-            ShowAddPlaceDialog(
-                latLng = latLng,
-                placeRepository = placeRepository,
-                coroutineScope = coroutineScope,
-                onPlaceSaved = { place ->
-                    if (requestId != null) {
-                        // Prikazivanje dijaloga za dodavanje odgovora
-                        showAddResponseDialog = place to true
-                    } else {
-                        // Osvježavanje mesta i zatvaranje dijaloga
+    if (requestId == null) {
+        showAddPlaceDialog?.let { (latLng, showDialog) ->
+            if (showDialog) {
+                ShowAddPlaceDialog(
+                    latLng = latLng,
+                    placeRepository = placeRepository,
+                    coroutineScope = coroutineScope,
+                    onPlaceSaved = { place ->
                         coroutineScope.launch {
-                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
+                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
                         }
                         showAddPlaceDialog = null
-                    }
-                },
-                onDismiss = { showAddPlaceDialog = null }
-            )
+                    },
+                    onDismiss = { showAddPlaceDialog = null }
+                )
+            }
         }
-    }
+    } else {
+        Log.d("MapScreen", "requestId received: $requestId")  // Added log statement
 
-    showAddResponseDialog?.let { (place, showDialog) ->
-        if (showDialog) {
-            AddResponseDialog(
-                place = place,
-                requestId = requestId,
-                placeRepository = placeRepository,
-                onResponseSaved = {
-                    coroutineScope.launch {
-                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId)
-                    }
-                    showAddResponseDialog = null
-                    showAddPlaceDialog = null // Zatvaranje dijaloga za dodavanje mesta takođe
-                },
-                onDismiss = {
-                    showAddResponseDialog = null
-                    showAddPlaceDialog = null // Zatvaranje dijaloga za dodavanje mesta takođe
-                }
-            )
+        // Trigger dialog display if requestId is present
+        LaunchedEffect(requestId) {
+            showAddResponseDialog = Pair(null, true)
+        }
+
+        showAddResponseDialog?.let { (place, showDialog) ->
+            if (showDialog) {
+                ShowAddResponseDialog(
+                    requestId = requestId,
+                    onDismissRequest = { showAddResponseDialog = null },
+                    onPlaceAndResponseCreated = { placeId, responseId ->
+                        coroutineScope.launch {
+                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+                        }
+                    },
+                    placeRepository = placeRepository
+                )
+            }
         }
     }
 
@@ -237,13 +244,13 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
         }
     }
 }
-
 private fun fetchPlaces(
     placeRepository: PlaceRepository,
     places: SnapshotStateList<Place>,
     placeMarkers: MutableMap<String, Marker?>,
     googleMap: GoogleMap?,
-    selectedPlaceId: String?
+    placeId: String?,
+    selectedType: String?
 ) {
     placeRepository.getAllPlaces().get().addOnSuccessListener { result ->
         places.clear()
@@ -252,22 +259,26 @@ private fun fetchPlaces(
 
         for (document in result) {
             val place = document.toObject(Place::class.java)
-            places.add(place)
-            val position = LatLng(place.location.latitude, place.location.longitude)
-            val markerOptions = MarkerOptions().position(position).title(place.name)
+            if (selectedType == null || place.type == selectedType) {
+                places.add(place)
+                val position = LatLng(place.location.latitude, place.location.longitude)
+                val markerOptions = MarkerOptions()
+                    .position(position)
+                    .title(place.name)
+                    .icon(
+                        if (place.id == placeId) {
+                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN) // Green for selected place
+                        } else {
+                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Default color for other places
+                        }
+                    )
 
-            // Ako je ID mesta isti kao prosleđeni placeId, postavi marker u zelenoj boji
-            val markerColor = if (place.id == selectedPlaceId) BitmapDescriptorFactory.HUE_GREEN else BitmapDescriptorFactory.HUE_RED
-            markerOptions.icon(BitmapDescriptorFactory.defaultMarker(markerColor))
-
-            val marker = googleMap?.addMarker(markerOptions)
-            placeMarkers[place.id] = marker
+                val marker = googleMap?.addMarker(markerOptions)
+                placeMarkers[place.id] = marker
+            }
         }
-    }.addOnFailureListener { exception ->
-        Log.e("MapScreen", "Error fetching places: ${exception.message}")
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -278,208 +289,317 @@ fun ShowAddPlaceDialog(
     onPlaceSaved: (Place) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var context = LocalContext.current
     var placeName by remember { mutableStateOf("") }
-    var placeType by remember { mutableStateOf("") }
-    var placePurpose by remember { mutableStateOf("") }
+    var placeType by remember { mutableStateOf("Frizerski salon") }
+    var placePurpose by remember { mutableStateOf("Usluga") }
     var placeDescription by remember { mutableStateOf("") }
-    val currentUser = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
+    var expandedType by remember { mutableStateOf(false) }
+    var expandedPurpose by remember { mutableStateOf(false) }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    val context = LocalContext.current
+    var imageUrl by remember { mutableStateOf<String?>(null) }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            imageUri = it
-        }
-    }
+    // Getting the current user
+    val currentUser = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
 
-    val cameraUri = remember { mutableStateOf<Uri?>(null) }
+    // Image capture and selection
     val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) {
-            cameraUri.value?.let { uri ->
-                imageUri = uri
-                Log.e("CAMERA", "Image URI: $uri")
+            coroutineScope.launch {
+                imageUri?.let {
+                    // Handle the imageUri (upload or display)
+                    imageUrl = uploadImageToStorage(it, context)
+                }
             }
         }
     }
 
-    // Kreiranje privremene URI za kameru
-    val createImageUri: () -> Uri = {
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "temp_image.jpg")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+    val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        coroutineScope.launch {
+            uri?.let {
+                imageUri = it
+                // Handle the imageUri (upload or display)
+                imageUrl = uploadImageToStorage(it, context)
+            }
         }
-        context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
     }
 
     AlertDialog(
-        onDismissRequest = {
-            onDismiss()
-        },
-        title = { Text("Dodaj Mesto") },
+        onDismissRequest = onDismiss,
+        title = { Text("Dodaj Novo Mesto") },
         text = {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Pregled slike
-                Surface(
-                    modifier = Modifier
-                        .size(150.dp)
-                        .border(3.dp, Color.White, RectangleShape),
-                    color = Color.Gray
-                ) {
-                    imageUri?.let {
-                        AsyncImage(
-                            model = it,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-
-                // Odabir slike
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_gallery),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clickable { imagePickerLauncher.launch("image/*") }
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_camera),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clickable {
-                                cameraUri.value = createImageUri()
-                                cameraUri.value?.let { uri ->
-                                    takePictureLauncher.launch(uri)
-                                }
-                            }
-                    )
-                }
-                // Unos podataka o mestu
+            Column {
                 OutlinedTextField(
                     value = placeName,
                     onValueChange = { placeName = it },
                     label = { Text("Naziv Mesta") }
                 )
-                OutlinedTextField(
-                    value = placeType,
-                    onValueChange = { placeType = it },
-                    label = { Text("Tip Mesta") }
-                )
-                OutlinedTextField(
-                    value = placePurpose,
-                    onValueChange = { placePurpose = it },
-                    label = { Text("Svrha Mesta") }
-                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedType,
+                    onExpandedChange = { expandedType = !expandedType }
+                ) {
+                    OutlinedTextField(
+                        value = placeType,
+                        onValueChange = {},
+                        label = { Text("Tip Mesta") },
+                        readOnly = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedType,
+                        onDismissRequest = { expandedType = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf("Frizerski salon", "Kozmeticki salon", "Parfimerija", "Drogerija").forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type) },
+                                onClick = {
+                                    placeType = type
+                                    expandedType = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedPurpose,
+                    onExpandedChange = { expandedPurpose = !expandedPurpose }
+                ) {
+                    OutlinedTextField(
+                        value = placePurpose,
+                        onValueChange = {},
+                        label = { Text("Svrha Mesta") },
+                        readOnly = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPurpose)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedPurpose,
+                        onDismissRequest = { expandedPurpose = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf("Usluga", "Kupovina", "Tretman", "Uzorkovanje proizvoda").forEach { purpose ->
+                            DropdownMenuItem(
+                                text = { Text(purpose) },
+                                onClick = {
+                                    placePurpose = purpose
+                                    expandedPurpose = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = placeDescription,
                     onValueChange = { placeDescription = it },
                     label = { Text("Opis Mesta") }
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                imageUri?.let {
+                    Image(
+                        painter = rememberImagePainter(it),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(150.dp)
+                            .border(2.dp, Color.Gray, RectangleShape)
+                            .padding(4.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row {
+                    Button(onClick = {
+                        val photoUri = createImageUri(context)
+                        photoUri?.let {
+                            imageUri = it
+                            takePictureLauncher.launch(photoUri)
+                        }
+                    }) {
+                        Text("Snimite sliku")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = { pickImageLauncher.launch("image/*") }) {
+                        Text("Izaberite iz galerije")
+                    }
+                }
             }
         },
         confirmButton = {
             Button(onClick = {
-                val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                val currentDate = Date()
-                val place = Place(
-                    name = placeName,
-                    type = placeType,
-                    purpose = placePurpose,
-                    description = placeDescription,
-                    location = GeoPoint(latLng.latitude, latLng.longitude),
-                    creatorID = currentUser,
-                    dateCreated = dateFormatter.format(currentDate),
-                    timeCreated = timeFormatter.format(currentDate),
-                    imageUrl = imageUri?.toString()  // Čuvanje URL slike ako je dostupna
-                )
-                placeRepository.savePlace(place)
-                onPlaceSaved(place) // Obaveštavanje da je mesto sačuvano
+                coroutineScope.launch {
+                    imageUri?.let { uri ->
+                        imageUrl = uploadImageToStorage(uri, context)
+                    }
+                    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                    val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                    val currentDate = Date()
+                    val place = Place(
+                        id = UUID.randomUUID().toString(),
+                        name = placeName,
+                        location = GeoPoint(latLng.latitude, latLng.longitude),
+                        type = placeType,
+                        purpose = placePurpose,
+                        description = placeDescription,
+                        creatorID = currentUser,
+                        dateCreated = dateFormatter.format(currentDate),
+                        timeCreated = timeFormatter.format(currentDate),
+                        imageUrl = imageUrl
+                    )
+                    placeRepository.savePlace(place)
+                    onPlaceSaved(place)
+                }
             }) {
-                Text("Dodaj Mesto")
+                Text("Sačuvaj")
             }
         },
         dismissButton = {
-            Button(onClick = {
-                onDismiss()
-            }) {
-                Text("Otkaži")
+            Button(onClick = onDismiss) {
+                Text("Odustani")
             }
         }
     )
 }
+
+
+private fun createImageUri(context: Context): Uri? {
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "temp_image_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        }
+        context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+    } catch (e: Exception) {
+        Log.e("ImageCapture", "Failed to create image URI", e)
+        null
+    }
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddResponseDialog(
-    place: Place?,
-    requestId: String?,
-    placeRepository: PlaceRepository,
-    onResponseSaved: () -> Unit,
-    onDismiss: () -> Unit
+fun ShowAddResponseDialog(
+    requestId: String,
+    onDismissRequest: () -> Unit,
+    onPlaceAndResponseCreated: (placeId: String, responseId: String) -> Unit,
+    placeRepository: PlaceRepository // Assuming you have a repository instance passed here
 ) {
     var comment by remember { mutableStateOf("") }
-    val currentUser = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
-    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-    val currentDate = Date()
+    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var request by remember { mutableStateOf<Request?>(null) }
 
-    AlertDialog(
-        onDismissRequest = {
-            onDismiss()
-        },
-        title = { Text("Dodaj Odgovor") },
-        text = {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("Mesto: ${place?.name ?: "Nepoznato"}")
-                OutlinedTextField(
-                    value = comment,
-                    onValueChange = { comment = it },
-                    label = { Text("Komentar") }
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                place?.let {
-                    val response = mapOf(
-                        "placeId" to it.id,
-                        "requestId" to requestId,
-                        "comment" to comment,
-                        "creatorID" to currentUser,
-                        "dateCreated" to dateFormatter.format(currentDate),
-                        "timeCreated" to timeFormatter.format(currentDate)
-                    ) as Map<String, Any>
-                    placeRepository.saveResponse(response)
-                }
-                onResponseSaved()
-                onDismiss()
-            }) {
-                Text("Sačuvaj Odgovor")
-            }
-        },
-        dismissButton = {
-            Button(onClick = {
-                onDismiss()
-            }) {
-                Text("Otkaži")
-            }
+    val context = LocalContext.current
+
+    LaunchedEffect(requestId) {
+        if (requestId != null) {
+            request = placeRepository.getRequestById(requestId)
         }
-    )
+    }
+
+    if (request != null) {
+        AlertDialog(
+            onDismissRequest = { onDismissRequest() },
+            title = { Text(text = "Add Response") },
+            text = {
+                Column {
+                    Text("Type: ${request!!.type}")
+                    Text("Purpose: ${request!!.purpose}")
+                    Text("Comment:")
+                    OutlinedTextField(
+                        value = comment,
+                        onValueChange = { comment = it },
+                        label = { Text("Enter your comment") }
+                    )
+                    // Assuming you have a way to select an image (camera/gallery integration)
+                    Button(onClick = { /* Handle image selection */ }) {
+                        Text("Select Image")
+                    }
+                    imageUrl?.let {
+                        Text("Selected Image: $it")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val placeId = createPlaceAndResponse(
+                            request!!.type,
+                            request!!.purpose,
+                            request!!.creatorID,
+                            comment,
+                            imageUrl,
+                            placeRepository
+                        )
+                        onPlaceAndResponseCreated(placeId, requestId)
+                        onDismissRequest()
+                    }
+                ) {
+                    Text("Sacuvaj")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { onDismissRequest() }) {
+                    Text("Otkazi")
+                }
+            }
+        )
+    }
 }
+
+fun createPlaceAndResponse(
+    type: String,
+    purpose: String,
+    creatorID: String,
+    comment: String,
+    imageUrl: String?,
+    placeRepository: PlaceRepository
+): String {
+    // Use the same logic as before to create a place and response
+    val placeId = UUID.randomUUID().toString()
+    val responseId = UUID.randomUUID().toString()
+
+    val currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+    val currentTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
+
+    val place = Place(
+        id = placeId,
+        type = type,
+        purpose = purpose,
+        creatorID = creatorID,
+        dateCreated = currentDate,
+        timeCreated = currentTime,
+        imageUrl = imageUrl
+    )
+
+    val response = Response(
+        id = responseId,
+        placeId = placeId,
+        creatorID = creatorID,
+        date = currentDate,
+        time = currentTime,
+        comment = comment
+    )
+
+    // Save both place and response to Firestore
+    placeRepository.savePlace(place)
+    placeRepository.saveResponse(response)
+
+    return placeId
+}
+
 
 @Composable
 private fun showPlaceDetails(placeId: String, placeRepository: PlaceRepository, onDismiss: () -> Unit) {

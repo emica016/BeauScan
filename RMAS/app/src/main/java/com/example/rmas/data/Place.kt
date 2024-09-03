@@ -6,7 +6,7 @@ import com.google.firebase.firestore.GeoPoint
 import org.osmdroid.views.overlay.OverlayItem
 
 data class Place(
-    @DocumentId var id: String = "",
+   @DocumentId var id: String = "",
     var name: String = "",
     var type: String = PlaceType.Store.toString(),
     var description: String="",

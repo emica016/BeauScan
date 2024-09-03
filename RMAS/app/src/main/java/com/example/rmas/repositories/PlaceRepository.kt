@@ -7,7 +7,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import java.util.*
 
 class PlaceRepository(private val context: Context) {
     private val db = FirebaseFirestore.getInstance()
@@ -42,7 +41,7 @@ class PlaceRepository(private val context: Context) {
     }
 
     // U PlaceRepository.kt
-    fun saveResponse(response: Map<String, Any>) {
+    fun saveResponse(response: Response) {
         val responsesRef = db.collection("responses")
         responsesRef.add(response)
             .addOnSuccessListener {
@@ -53,6 +52,15 @@ class PlaceRepository(private val context: Context) {
             }
     }
 
+    suspend fun getRequestById(requestId: String): Request? {
+        return try {
+            val documentSnapshot = db.collection("requests").document(requestId).get().await()
+            documentSnapshot.toObject(Request::class.java)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 
     fun getCommentsForPlace(id: String): List<String>? {
         return placeCollection.document(id).get().getResult().get("comments") as? List<String>
@@ -162,6 +170,30 @@ class PlaceRepository(private val context: Context) {
                 Log.e("PlaceRepository", "Error fetching places", e)
                 onSuccess(emptyList())
             }
+    }
+
+    suspend fun getPlaces(typeFilter: String?): List<Place> {
+        return try {
+            val query = db.collection("places")
+
+            // Primena filtera ako je tip naveden
+            val filteredQuery = if (typeFilter != null && typeFilter != "Svi Tipovi") {
+                query.whereEqualTo("type", typeFilter)
+            } else {
+                query
+            }
+
+            val result = filteredQuery.get().await()
+
+            result.documents.mapNotNull { document ->
+                document.toObject(Place::class.java)?.apply {
+                    id = document.id // Postavljanje ID-a dokumenta
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 
 
