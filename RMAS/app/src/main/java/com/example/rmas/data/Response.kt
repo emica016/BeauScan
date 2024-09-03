@@ -9,5 +9,6 @@ data class Response(
     val creatorID: String = "",
     val date: String = "",
     val time: String = "",
-    val comment: String = ""
+    val comment: String = "",
+    val requestId: String? = "",
 )

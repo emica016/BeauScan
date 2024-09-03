@@ -1,7 +1,6 @@
 package com.example.rmas
 
 import android.annotation.SuppressLint
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,24 +8,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.rmas.data.Request
-import com.example.rmas.database.FirebaseDatabase
-import com.example.rmas.navigation.Screens
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
@@ -34,7 +27,7 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun RequestDetails(
     userId: String,
-    requestId: String,
+    requestId: String?,
     navHostController: NavHostController,
     onResponseClicked: (String) -> Unit
 ) {
@@ -44,11 +37,13 @@ fun RequestDetails(
     var responses by remember { mutableStateOf(emptyList<String>()) }
 
     LaunchedEffect(requestId) {
-        FirebaseFirestore.getInstance().collection("requests").document(requestId).get().addOnSuccessListener { snapshot ->
-            request = snapshot.toObject(Request::class.java)
-            numberOfResponses = request?.numberOfResponses ?: 0
-            responses = request?.responses ?: emptyList()
-        }.await()
+        if (requestId != null) {
+            FirebaseFirestore.getInstance().collection("requests").document(requestId).get().addOnSuccessListener { snapshot ->
+                request = snapshot.toObject(Request::class.java)
+                numberOfResponses = request?.numberOfResponses ?: 0
+                responses = request?.responses ?: emptyList()
+            }.await()
+        }
     }
 
     Column(
@@ -63,9 +58,14 @@ fun RequestDetails(
                         .verticalScroll(scrolState)
                 ) {
                     request?.let { req ->
-                        ProfilHeader(req, numberOfResponses, responses, navHostController, requestId, onResponseClicked)
+                        if (requestId != null) {
+                            ProfilHeader(req, numberOfResponses, responses, navHostController, requestId, onResponseClicked)
+                        }
                     }
+
                 }
+
+
             }
         }
     }
@@ -138,6 +138,7 @@ private fun ProfilHeader(
         }
 
         Text(text = request.description, fontSize = 18.sp)
+
 
         Surface(
             shape = RoundedCornerShape(22.dp),

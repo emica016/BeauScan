@@ -70,12 +70,11 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
     val selectedPlaceId = remember { mutableStateOf<String?>(null) }
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
     var selectedType by remember { mutableStateOf<String?>(null) }
+    var showAddPlaceDialog by remember { mutableStateOf<Pair<LatLng, Boolean>?>(null) }
+    var showAddResponseDialog by remember { mutableStateOf<Pair<Place, Boolean>?>(null) }
 
     val mapProperties = remember { MapProperties(isMyLocationEnabled = true) }
     val mapUiSettings = remember { MapUiSettings(zoomControlsEnabled = true) }
-
-    var showAddPlaceDialog by remember { mutableStateOf<Pair<LatLng, Boolean>?>(null) }
-    var showAddResponseDialog by remember { mutableStateOf<Pair<Place?, Boolean>?>(null) }
 
     var currentLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
@@ -197,44 +196,40 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
         }
     }
 
-    if (requestId == null) {
-        showAddPlaceDialog?.let { (latLng, showDialog) ->
-            if (showDialog) {
-                ShowAddPlaceDialog(
-                    latLng = latLng,
-                    placeRepository = placeRepository,
-                    coroutineScope = coroutineScope,
-                    onPlaceSaved = { place ->
-                        coroutineScope.launch {
-                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
-                        }
-                        showAddPlaceDialog = null
-                    },
-                    onDismiss = { showAddPlaceDialog = null }
-                )
-            }
+    // Show AddPlaceDialog
+    showAddPlaceDialog?.let { (latLng, showDialog) ->
+        if (showDialog) {
+            ShowAddPlaceDialog(
+                latLng = latLng,
+                placeRepository = placeRepository,
+                coroutineScope = coroutineScope,
+                onPlaceSaved = { place ->
+                    coroutineScope.launch {
+                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+                    }
+                    showAddPlaceDialog = null
+                    if (requestId != null) {
+                        // If requestId is not null, show the AddResponseDialog
+                        showAddResponseDialog = place to true
+                    }
+                },
+                onDismiss = { showAddPlaceDialog = null }
+            )
         }
-    } else {
-        Log.d("MapScreen", "requestId received: $requestId")  // Added log statement
+    }
 
-        // Trigger dialog display if requestId is present
-        LaunchedEffect(requestId) {
-            showAddResponseDialog = Pair(null, true)
-        }
-
-        showAddResponseDialog?.let { (place, showDialog) ->
-            if (showDialog) {
-                ShowAddResponseDialog(
-                    requestId = requestId,
-                    onDismissRequest = { showAddResponseDialog = null },
-                    onPlaceAndResponseCreated = { placeId, responseId ->
-                        coroutineScope.launch {
-                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
-                        }
-                    },
-                    placeRepository = placeRepository
-                )
-            }
+    // Show AddResponseDialog
+    showAddResponseDialog?.let { (place, showDialog) ->
+        if (showDialog) {
+            ShowAddResponseDialog(
+                place = place,
+                requestId = requestId,
+                placeRepository = placeRepository,
+                coroutineScope = coroutineScope,
+                onDismiss = {
+                    showAddResponseDialog = null
+                }
+            )
         }
     }
 
@@ -244,6 +239,7 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
         }
     }
 }
+
 private fun fetchPlaces(
     placeRepository: PlaceRepository,
     places: SnapshotStateList<Place>,
@@ -487,118 +483,61 @@ private fun createImageUri(context: Context): Uri? {
     }
 }
 
-
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShowAddResponseDialog(
-    requestId: String,
-    onDismissRequest: () -> Unit,
-    onPlaceAndResponseCreated: (placeId: String, responseId: String) -> Unit,
-    placeRepository: PlaceRepository // Assuming you have a repository instance passed here
+    place: Place,
+    requestId: String?,
+    placeRepository: PlaceRepository,
+    coroutineScope: CoroutineScope,
+    onDismiss: () -> Unit
 ) {
     var comment by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf<String?>(null) }
-    var request by remember { mutableStateOf<Request?>(null) }
+    val currentUser = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
 
-    val context = LocalContext.current
-
-    LaunchedEffect(requestId) {
-        if (requestId != null) {
-            request = placeRepository.getRequestById(requestId)
-        }
-    }
-
-    if (request != null) {
-        AlertDialog(
-            onDismissRequest = { onDismissRequest() },
-            title = { Text(text = "Add Response") },
-            text = {
-                Column {
-                    Text("Type: ${request!!.type}")
-                    Text("Purpose: ${request!!.purpose}")
-                    Text("Comment:")
-                    OutlinedTextField(
-                        value = comment,
-                        onValueChange = { comment = it },
-                        label = { Text("Enter your comment") }
-                    )
-                    // Assuming you have a way to select an image (camera/gallery integration)
-                    Button(onClick = { /* Handle image selection */ }) {
-                        Text("Select Image")
-                    }
-                    imageUrl?.let {
-                        Text("Selected Image: $it")
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val placeId = createPlaceAndResponse(
-                            request!!.type,
-                            request!!.purpose,
-                            request!!.creatorID,
-                            comment,
-                            imageUrl,
-                            placeRepository
-                        )
-                        onPlaceAndResponseCreated(placeId, requestId)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text("Sacuvaj")
-                }
-            },
-            dismissButton = {
-                Button(onClick = { onDismissRequest() }) {
-                    Text("Otkazi")
-                }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Dodaj Komentar") },
+        text = {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Komentar") }
+                )
             }
-        )
-    }
+        },
+        confirmButton = {
+            Button(onClick = {
+                coroutineScope.launch {
+                    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                    val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                    val currentDate = Date()
+                    val response = Response(
+                        placeId = place.id,
+                        creatorID = currentUser,
+                        date = dateFormatter.format(currentDate),
+                        time = timeFormatter.format(currentDate),
+                        comment = comment,
+                        requestId = requestId
+                    )
+                    placeRepository.saveResponse(response)
+                    onDismiss()
+                }
+            }) {
+                Text("Sačuvaj")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Odustani")
+            }
+        }
+    )
 }
 
-fun createPlaceAndResponse(
-    type: String,
-    purpose: String,
-    creatorID: String,
-    comment: String,
-    imageUrl: String?,
-    placeRepository: PlaceRepository
-): String {
-    // Use the same logic as before to create a place and response
-    val placeId = UUID.randomUUID().toString()
-    val responseId = UUID.randomUUID().toString()
-
-    val currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-    val currentTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
-
-    val place = Place(
-        id = placeId,
-        type = type,
-        purpose = purpose,
-        creatorID = creatorID,
-        dateCreated = currentDate,
-        timeCreated = currentTime,
-        imageUrl = imageUrl
-    )
-
-    val response = Response(
-        id = responseId,
-        placeId = placeId,
-        creatorID = creatorID,
-        date = currentDate,
-        time = currentTime,
-        comment = comment
-    )
-
-    // Save both place and response to Firestore
-    placeRepository.savePlace(place)
-    placeRepository.saveResponse(response)
-
-    return placeId
-}
 
 
 @Composable

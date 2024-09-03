@@ -1,15 +1,11 @@
 package com.example.rmas
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.material.*
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,10 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import com.example.rmas.data.*
-import com.google.firebase.Firebase
-import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 
 @Composable
@@ -30,8 +26,16 @@ fun LeaderboardScreen(navController: NavHostController) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Users", "Places")
 
-    Column {
-        TabRow(selectedTabIndex = selectedTab) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.White
+        ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
@@ -49,7 +53,6 @@ fun LeaderboardScreen(navController: NavHostController) {
 
 @Composable
 fun UserLeaderboardTab() {
-    // Get users and requests/responses from Firestore
     val users = remember { mutableStateListOf<User>() }
     val userRequestResponseCounts = remember { mutableStateMapOf<String, Pair<Int, Int>>() }
 
@@ -68,7 +71,11 @@ fun UserLeaderboardTab() {
         }
     }
 
-    LazyColumn {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         itemsIndexed(users.sortedByDescending { it.points }) { index, user ->
             val requestResponseCount = userRequestResponseCounts[user.email] ?: Pair(0, 0)
             UserLeaderboardItem(user, requestResponseCount.first, requestResponseCount.second, index + 1)
@@ -81,36 +88,53 @@ fun UserLeaderboardItem(user: User, requestCount: Int, responseCount: Int, rank:
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 12.dp)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "$rank.",
             fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.width(30.dp)
+            fontSize = 20.sp,
+            modifier = Modifier.width(40.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
         Image(
-            painter = rememberImagePainter(data = user.image),
+            painter = rememberAsyncImagePainter(user.image),
             contentDescription = "User Image",
-            modifier = Modifier.size(50.dp),
+            modifier = Modifier
+                .size(50.dp)
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)),
             contentScale = ContentScale.Crop
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column {
-            Text(text = user.username, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(text = "Points: ${user.points}")
-            Text(text = "Requests: $requestCount")
-            Text(text = "Responses: $responseCount")
+            Text(
+                text = user.username,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Points: ${user.points}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "Requests: $requestCount",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "Responses: $responseCount",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
         }
     }
-    Divider(color = Color.Gray, thickness = 1.dp)
+    Divider(color = Color.LightGray, thickness = 1.dp)
 }
 
 @Composable
 fun PlaceLeaderboardTab() {
-    // Get places from Firestore
     val places = remember { mutableStateListOf<Place>() }
 
     LaunchedEffect(Unit) {
@@ -119,7 +143,11 @@ fun PlaceLeaderboardTab() {
         places.addAll(placesList)
     }
 
-    LazyColumn {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         itemsIndexed(places.sortedByDescending { it.rating }) { index, place ->
             PlaceLeaderboardItem(place, index + 1)
         }
@@ -131,32 +159,53 @@ fun PlaceLeaderboardItem(place: Place, rank: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 12.dp)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "$rank.",
             fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.width(30.dp)
+            fontSize = 20.sp,
+            modifier = Modifier.width(40.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
         place.imageUrl?.let {
             Image(
-                painter = rememberImagePainter(data = it),
+                painter = rememberAsyncImagePainter(it),
                 contentDescription = "Place Image",
-                modifier = Modifier.size(50.dp),
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)),
                 contentScale = ContentScale.Crop
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column {
-            Text(text = place.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(text = "Type: ${place.type}")
-            Text(text = "Purpose: ${place.purpose}")
-            Text(text = "Location: ${place.location.latitude}, ${place.location.longitude}")
-            Text(text = "Rating: ${place.rating}")
+            Text(
+                text = place.name,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Type: ${place.type}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "Purpose: ${place.purpose}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "Location: ${place.location.latitude}, ${place.location.longitude}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Text(
+                text = "Rating: ${place.rating}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
         }
     }
-    Divider(color = Color.Gray, thickness = 1.dp)
+    Divider(color = Color.LightGray, thickness = 1.dp)
 }

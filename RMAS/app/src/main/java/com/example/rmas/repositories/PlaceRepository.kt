@@ -2,6 +2,8 @@ package com.example.rmas.data
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.tasks.Task
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -15,14 +17,12 @@ class PlaceRepository(private val context: Context) {
     private val userCollection = db.collection("users")
 
     fun savePlace(place: Place) {
-        placeCollection.add(place).addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                Log.d("PlaceRepository", "Place saved successfully")
-            } else {
-                Log.d("PlaceRepository", "Error saving place: ${task.exception?.message}")
-            }
+        val placeCollection = db.collection("places")
+        place.id?.let {
+            placeCollection.document(it).set(place)
         }
     }
+
 
     fun getAllPlaces(): Query {
         return placeCollection.orderBy("dateCreated", Query.Direction.DESCENDING)
@@ -61,6 +61,34 @@ class PlaceRepository(private val context: Context) {
             null
         }
     }
+
+    fun getPlaceById(placeId: String): Task<DocumentSnapshot> {
+        return db.collection("places").document(placeId).get()
+    }
+
+    fun getLatestPlaceForUser(userId: String, callback: (Place?) -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("places")
+            .whereEqualTo("creatorID", userId)
+            .orderBy("dateCreated", Query.Direction.DESCENDING)
+            .orderBy("timeCreated", Query.Direction.DESCENDING)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { result ->
+                if (result.isEmpty) {
+                    callback(null)
+                } else {
+                    val document = result.documents.first()
+                    val place = document.toObject(Place::class.java)
+                    callback(place)
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.w("PlaceRepository", "Error getting documents.", e)
+                callback(null)
+            }
+    }
+
 
     fun getCommentsForPlace(id: String): List<String>? {
         return placeCollection.document(id).get().getResult().get("comments") as? List<String>
