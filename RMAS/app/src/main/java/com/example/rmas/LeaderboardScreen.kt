@@ -66,7 +66,7 @@ fun UserLeaderboardTab() {
 
         users.forEach { user ->
             val requestCount = requestCollection.documents.count { it.getString("creatorID") == user.username }
-            val responseCount = responseCollection.documents.count { it.getString("creatorID") == user.username }
+            val responseCount = responseCollection.documents.count { it.getString("creatorID") == user.email }
             userRequestResponseCounts[user.email] = Pair(requestCount, responseCount)
         }
     }

@@ -59,7 +59,7 @@ import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostController) {
+fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHostController: NavHostController) {
     val context = LocalContext.current
     val placeRepository = remember { PlaceRepository(context) }
     val coroutineScope = rememberCoroutineScope()
@@ -80,7 +80,7 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
 
     LaunchedEffect(selectedType) {
         if (googleMap != null) {
-            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
         }
     }
 
@@ -105,7 +105,7 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
 
                                 map.setOnMapLoadedCallback {
                                     coroutineScope.launch {
-                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
                                     }
                                 }
                                 map.setOnMapClickListener { latLng ->
@@ -205,7 +205,7 @@ fun MapScreen(requestId: String?, placeId: String?, navHostController: NavHostCo
                 coroutineScope = coroutineScope,
                 onPlaceSaved = { place ->
                     coroutineScope.launch {
-                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType)
+                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
                     }
                     showAddPlaceDialog = null
                     if (requestId != null) {
@@ -246,7 +246,8 @@ private fun fetchPlaces(
     placeMarkers: MutableMap<String, Marker?>,
     googleMap: GoogleMap?,
     placeId: String?,
-    selectedType: String?
+    selectedType: String?,
+    placeRespond: String?
 ) {
     placeRepository.getAllPlaces().get().addOnSuccessListener { result ->
         places.clear()
@@ -262,11 +263,12 @@ private fun fetchPlaces(
                     .position(position)
                     .title(place.name)
                     .icon(
-                        if (place.id == placeId) {
+                        if (place.id == placeId || (placeRespond!= null && place.id == placeRespond )) {
                             BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN) // Green for selected place
                         } else {
                             BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Default color for other places
                         }
+
                     )
 
                 val marker = googleMap?.addMarker(markerOptions)

@@ -35,7 +35,6 @@ import com.example.rmas.data.Request
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-// Home screen composable function
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -72,7 +71,6 @@ fun Home(idUser: String, navHostController: NavHostController, onRequestClicked:
                     IconButton(onClick = {
                         FirebaseAuth.getInstance().signOut()
                         val intent = Intent(context, StartActivity::class.java).apply {
-                            // Clear the activity stack and start the StartActivity
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                         }
                         context.startActivity(intent)
@@ -145,7 +143,6 @@ fun Home(idUser: String, navHostController: NavHostController, onRequestClicked:
     )
 }
 
-// Request list item composable function
 @Composable
 fun RequestListItem(request: Request, onRequestClicked: (String) -> Unit) {
     Surface(
@@ -200,6 +197,22 @@ fun RequestListItem(request: Request, onRequestClicked: (String) -> Unit) {
                     text = "Created by: ${request.creatorID}",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Display truncated description
+                val truncatedDescription = if (request.description.length > 50) {
+                    "${request.description.take(50)}..."
+                } else {
+                    request.description
+                }
+
+                Text(
+                    text = truncatedDescription,
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))

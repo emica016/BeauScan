@@ -69,8 +69,6 @@ fun Navbar() {
                     )
                 }
 
-
-
                 IconButton(
                     onClick = {
                         selected.value = Icons.Default.Place
@@ -106,6 +104,7 @@ fun Navbar() {
                         tint = if (selected.value == Icons.Default.PlayArrow) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.tertiary
                     )
                 }
+
                 IconButton(
                     onClick = {
                         selected.value = Icons.Default.Star
@@ -165,25 +164,34 @@ fun Navbar() {
                     RequestDetails(
                         userId = getCurrentUser()!!,
                         requestId = requestId,
-                        navHostController = navigationController
-                    ) { mapRequestId ->
-                        navigationController.navigate("map_screen/$mapRequestId")
-                    }
+                        navHostController = navigationController,
+                        onResponseClicked = { responseId ->
+                            navigationController.navigate("map_screen/$responseId")
+                        },
+                        onPlaceRespond = { placeRespondId ->
+                            navigationController.navigate("map_screen/$placeRespondId")
+                        }
+                    )
                 }
+            }
+
+            composable("map_screen/{placeRespondId}") { backStackEntry ->
+                val placeRespondId: String? = backStackEntry.arguments?.getString("placeRespondId")
+                MapScreen(requestId = null, placeId = null, placeRespond = placeRespondId, navHostController = navigationController)
             }
 
             composable("map_screen/{requestId}") { backStackEntry ->
                 val requestId: String? = backStackEntry.arguments?.getString("requestId")
-                MapScreen(requestId = requestId, placeId = null, navHostController = navigationController)
+                MapScreen(requestId = requestId, placeId = null, placeRespond = null, navHostController = navigationController)
             }
 
             composable("map_screen/place/{placeId}") { backStackEntry ->
                 val placeId: String? = backStackEntry.arguments?.getString("placeId")
-                MapScreen(requestId = null, placeId = placeId, navHostController = navigationController)
+                MapScreen(requestId = null, placeId = placeId, placeRespond = null, navHostController = navigationController)
             }
 
             composable(Screens.MapScreen.screen) {
-                MapScreen(requestId = null, placeId = null, navHostController = navigationController)
+                MapScreen(requestId = null, placeId = null, placeRespond = null, navHostController = navigationController)
             }
 
             composable(Screens.CreateRequest.screen) {
