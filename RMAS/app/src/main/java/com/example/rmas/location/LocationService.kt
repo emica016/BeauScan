@@ -16,7 +16,6 @@ import com.example.rmas.MainActivity
 import com.example.rmas.R
 import com.example.rmas.data.User
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -27,10 +26,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 
 class LocationService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -66,7 +62,7 @@ class LocationService : Service() {
                 stop()
             }
             ACTION_FIND_NEARBY -> {
-                Log.d("NearbyService", "Service started")
+                Log.d("LocationService", "Service started for nearby places")
                 val notification = createNotification()
                 startForeground(NOTIFICATION_ID, notification)
                 start(placeIsNearby = true)
@@ -141,54 +137,52 @@ class LocationService : Service() {
             .build()
     }
 
-    private fun calculateHaversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6371000.0
-        val latDistance = Math.toRadians(lat2 - lat1)
-        val lonDistance = Math.toRadians(lon2 - lon1)
-        val a = sin(latDistance / 2) * sin(latDistance / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(lonDistance / 2) * sin(lonDistance / 2)
+    private fun calculateHaversineDistance(
+        lat1: Double, lon1: Double, lat2: Double, lon2: Double
+    ): Double {
+        val R = 6371e3 // Earth radius in meters
+        val lat1Rad = Math.toRadians(lat1)
+        val lat2Rad = Math.toRadians(lat2)
+        val deltaLatRad = Math.toRadians(lat2 - lat1)
+        val deltaLonRad = Math.toRadians(lon2 - lon1)
+
+        val a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
+                cos(lat1Rad) * cos(lat2Rad) *
+                sin(deltaLonRad / 2) * sin(deltaLonRad / 2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
         return R * c
     }
 
-    private fun checkProximityToPlaces(userLatitude: Double, userLongitude: Double) {
-        val firestore = FirebaseFirestore.getInstance()
+    private fun checkProximityToPlaces(latitude: Double, longitude: Double) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
-        serviceScope.launch {
-            val userResource = FirebaseAuth.getInstance().currentUser
+        FirebaseFirestore.getInstance()
+            .collection("places")
+            .get()
+            .addOnSuccessListener { documents ->
+                for (document in documents) {
+                    val placeLatitude = document.getDouble("latitude") ?: continue
+                    val placeLongitude = document.getDouble("longitude") ?: continue
+                    val distance = calculateHaversineDistance(latitude, longitude, placeLatitude, placeLongitude)
 
-            if (userResource != null) {
-                val user = userResource as? User
-
-                firestore.collection("places").get()
-                    .addOnSuccessListener { result ->
-                        for (document in result) {
-                            val geoPoint = document.getGeoPoint("location")
-                            val creatorId = document.getString("creatorID")
-
-                            if (geoPoint != null && (user == null || creatorId != user.id)) {
-                                val distance = calculateHaversineDistance(userLatitude, userLongitude, geoPoint.latitude, geoPoint.longitude)
-
-                                if (distance <= 1000) {
-                                    alertPlaceNearby(document.getString("title") ?: "Place")
-                                }
-                            }
-                        }
+                    if (distance < PROXIMITY_RADIUS) {
+                        Log.d("LocationService", "Nearby place found: ${document.id}")
+                        sendProximityNotification(document.id, distance) // Notify user
                     }
-                    .addOnFailureListener { e ->
-                        Log.e("LocationService", "Error fetching places", e)
-                    }
-            } else {
-                Log.e("LocationService", "Failed to fetch current user")
+                }
             }
-        }
+            .addOnFailureListener { e ->
+                Log.e("LocationService", "Error checking proximity", e)
+            }
     }
 
-    private fun alertPlaceNearby(placeName: String) {
-        val notificationChannelId = "LOCATION_SERVICE_CHANNEL"
+    private fun sendProximityNotification(placeId: String, distance: Double) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val notificationIntent = Intent(this, MainActivity::class.java)
+        val notificationIntent = Intent(this, MainActivity::class.java).apply {
+            putExtra(EXTRA_PLACE_ID, placeId)
+        }
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -196,25 +190,32 @@ class LocationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val notification = NotificationCompat.Builder(this, notificationChannelId)
-            .setContentTitle("Place Nearby!")
-            .setContentText("You're near the place \"$placeName\"!")
+        val notification = NotificationCompat.Builder(this, "LOCATION_SERVICE_CHANNEL")
+            .setContentTitle("Mesto u blizini!")
+            .setContentText("Pronađeno mesto $placeId na udaljenosti od $distance metara.")
             .setSmallIcon(R.drawable.place_notification)
             .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
             .build()
 
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NEARBY_PLACE_NOTIFICATION_ID, notification)
+        notificationManager.notify(placeId.hashCode(), notification) // Unique ID for each place
     }
 
+
+
+
+
+
+
     companion object {
-        const val ACTION_START = "ACTION_START"
-        const val ACTION_STOP = "ACTION_STOP"
-        const val ACTION_FIND_NEARBY = "ACTION_FIND_NEARBY"
-        const val ACTION_LOCATION_UPDATE = "ACTION_LOCATION_UPDATE"
-        const val EXTRA_LOCATION_LATITUDE = "EXTRA_LOCATION_LATITUDE"
-        const val EXTRA_LOCATION_LONGITUDE = "EXTRA_LOCATION_LONGITUDE"
-        private const val NOTIFICATION_ID = 1
-        private const val NEARBY_PLACE_NOTIFICATION_ID = 25
+        const val ACTION_START = "com.example.rmas.action.START"
+        const val ACTION_STOP = "com.example.rmas.action.STOP"
+        const val ACTION_FIND_NEARBY = "com.example.rmas.action.FIND_NEARBY"
+        const val ACTION_LOCATION_UPDATE = "com.example.rmas.action.LOCATION_UPDATE"
+        const val EXTRA_LOCATION_LATITUDE = "com.example.rmas.extra.LOCATION_LATITUDE"
+        const val EXTRA_LOCATION_LONGITUDE = "com.example.rmas.extra.LOCATION_LONGITUDE"
+        const val NOTIFICATION_ID = 1234
+        const val PROXIMITY_RADIUS = 1000 // Proximity radius in meters
+        const val EXTRA_PLACE_ID = "com.example.rmas.extra.PLACE_ID"
     }
 }

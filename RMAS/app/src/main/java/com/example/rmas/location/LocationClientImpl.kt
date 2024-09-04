@@ -17,36 +17,33 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
 class LocationClientImpl(
-    private val context: Context, //za pristupanje resursima i servisima sistema
-    private val client: FusedLocationProviderClient //pbezbedjuje objedinjene usluge lokacije
+    private val context: Context,
+    private val client: FusedLocationProviderClient
 ) : LocationClient {
-    override fun getLocationUpdates(interval: Long): Flow<Location> { //Flow je Kotlinova korutinska struktura koja omogucava emitovanje vise vrednosti tokom vremena.
+
+    override fun getLocationUpdates(interval: Long): Flow<Location> {
         return callbackFlow {
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (!checkLocationPermission()) {
                 throw LocationClient.LocationException("Nedostaje odobrenje za lokaciju")
             }
-//            if(!context.hasLocationPermission()){
-//                throw LocationClient.LocationException("Nedostaje odobrenje za lokaciju")
-//            }
 
             val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
             val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
-            if(!isGpsEnabled && !isNetworkEnabled){
+            if (!isGpsEnabled && !isNetworkEnabled) {
                 throw LocationClient.LocationException("GPS je onemogućen")
             }
 
             val request = LocationRequest.create()
-                .setInterval(interval) //interval u kojem aplikacija zeli da dobija azuriranje lokacije
-                .setFastestInterval(interval) //najkraci moguci interval izmedju azuriranja
+                .setInterval(interval)
+                .setFastestInterval(interval)
 
-            val locationCallback = object : LocationCallback(){ //reaguje na rezultate lokacije
-                override fun onLocationResult(result: LocationResult) { //kad god se dobije nova lokacija ova metoda se poziva
+            val locationCallback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
                     super.onLocationResult(result)
                     result.locations.lastOrNull()?.let { location ->
-                        launch { send(location) } //poslednja dobijena lokacija se salje kroz Flow
+                        launch { send(location) }
                     }
                 }
             }
@@ -54,12 +51,17 @@ class LocationClientImpl(
             client.requestLocationUpdates(
                 request,
                 locationCallback,
-                Looper.getMainLooper() //kako bi azuriranja stigla na glavnu nit
+                Looper.getMainLooper()
             )
 
-            awaitClose { //da se osigura da se lokacija vise nece azurirati kada nije potrebna
+            awaitClose {
                 client.removeLocationUpdates(locationCallback)
             }
         }
+    }
+
+    private fun checkLocationPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 }

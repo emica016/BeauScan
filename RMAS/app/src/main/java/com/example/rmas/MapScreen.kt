@@ -3,6 +3,7 @@ package com.example.rmas
 import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
@@ -49,8 +50,11 @@ import com.google.firebase.firestore.GeoPoint
 import com.example.rmas.data.Place
 import com.example.rmas.data.PlaceRepository
 import com.example.rmas.data.Response
+import com.example.rmas.location.LocationService
+import com.example.rmas.services.CameraService
 import com.example.rmas.services.uploadImageToStorage
 import com.google.accompanist.permissions.isGranted
+import com.google.firebase.storage.FirebaseStorage
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import kotlinx.coroutines.CoroutineScope
@@ -82,6 +86,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
     var currentLocationMarker by remember { mutableStateOf<Marker?>(null) }
 
+
     LaunchedEffect(selectedType) {
         if (googleMap != null) {
             fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
@@ -96,6 +101,37 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
     if (locationPermissionState.status.isGranted) {
         Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(
+                    onClick = {
+                        val intent = Intent(context, LocationService::class.java).apply {
+                            action = LocationService.ACTION_FIND_NEARBY
+                        }
+                        ContextCompat.startForegroundService(context, intent)
+                    },
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                ) {
+                    Text("Start Service")
+                }
+
+                Button(
+                    onClick = {
+                        val intent = Intent(context, LocationService::class.java).apply {
+                            action = LocationService.ACTION_STOP
+                        }
+                        context.stopService(intent)
+                    },
+                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                ) {
+                    Text("Stop Service")
+                }
+            }
+
             Box(modifier = Modifier.weight(1f)) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -165,6 +201,8 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                     label = { Text("Drogerija") }
                 )
             }
+
+
         }
 
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -295,7 +333,8 @@ fun ShowAddPlaceDialog(
     onPlaceSaved: (Place) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var context = LocalContext.current
+    val context = LocalContext.current
+    val cameraService = remember { CameraService(context) }
     var placeName by remember { mutableStateOf("") }
     val listOfTypes = listOf("Kozmeticki salon", "Frizerski salon", "Drogerija", "Parfimerija")
     var type by remember { mutableStateOf(listOfTypes[0]) }
@@ -306,33 +345,19 @@ fun ShowAddPlaceDialog(
     var expandedPur by remember { mutableStateOf(false) }
 
     var placeDescription by remember { mutableStateOf("") }
-
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var imageUrl by remember { mutableStateOf<String?>(null) }
+    var imageUrl by remember { mutableStateOf<String?>("") }
 
     // Getting the current user
     val currentUser = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"
 
-    // Image capture and selection
-    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) {
-            coroutineScope.launch {
-                imageUri?.let {
-                    // Handle the imageUri (upload or display)
-                    imageUrl = uploadImageToStorage(it, context)
-                }
-            }
-        }
-    }
-
-    val pickImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    // Set up the CameraService
+    cameraService.Setup { uri ->
         coroutineScope.launch {
-            uri?.let {
-                imageUri = it
-                // Handle the imageUri (upload or display)
-                imageUrl = uploadImageToStorage(it, context)
-            }
+            imageUri = uri
+            imageUrl = uploadImageToStorage(uri, context)
         }
+        0 // Return some int as callback expects Int
     }
 
     AlertDialog(
@@ -347,63 +372,65 @@ fun ShowAddPlaceDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 ExposedDropdownMenuBox(
-                    expanded = expanded ,
-                    onExpandedChange = {expanded = !expanded} )
-                {
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
                     OutlinedTextField(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(),
                         readOnly = false,
-                        value = type ,
+                        value = type,
                         onValueChange = {},
-                        label = {Text("Tip")},
-                        trailingIcon = {ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded )},
+                        label = { Text("Tip") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false}) {
-
-                        listOfTypes.forEach{ selectedOption ->
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOfTypes.forEach { selectedOption ->
                             DropdownMenuItem(
-                                text = { Text(selectedOption)},
+                                text = { Text(selectedOption) },
                                 onClick = {
                                     type = selectedOption
                                     expanded = false
                                 },
-                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding)
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
                         }
                     }
                 }
 
                 ExposedDropdownMenuBox(
-                    expanded = expandedPur ,
-                    onExpandedChange = {expandedPur = !expandedPur} )
-                {
+                    expanded = expandedPur,
+                    onExpandedChange = { expandedPur = !expandedPur }
+                ) {
                     OutlinedTextField(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(),
                         readOnly = false,
-                        value = purpose ,
+                        value = purpose,
                         onValueChange = {},
-                        label = {Text("Delatnost")},
-                        trailingIcon = {ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPur )},
+                        label = { Text("Delatnost") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPur) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
                         expanded = expandedPur,
-                        onDismissRequest = { expandedPur = false}) {
-
-                        listOfPurposes.forEach{ selectedOptionPurpose ->
+                        onDismissRequest = { expandedPur = false }
+                    ) {
+                        listOfPurposes.forEach { selectedOptionPurpose ->
                             DropdownMenuItem(
-                                text = { Text(selectedOptionPurpose)},
+                                text = { Text(selectedOptionPurpose) },
                                 onClick = {
                                     purpose = selectedOptionPurpose
                                     expandedPur = false
                                 },
-                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding)
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
                         }
                     }
                 }
@@ -430,17 +457,11 @@ fun ShowAddPlaceDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row {
-                    Button(onClick = {
-                        val photoUri = createImageUri(context)
-                        photoUri?.let {
-                            imageUri = it
-                            takePictureLauncher.launch(photoUri)
-                        }
-                    }) {
+                    Button(onClick = { cameraService.takePicture() }) {
                         Text("Snimite sliku")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { pickImageLauncher.launch("image/*") }) {
+                    Button(onClick = { cameraService.uploadPicture() }) {
                         Text("Izaberite iz galerije")
                     }
                 }
@@ -449,9 +470,6 @@ fun ShowAddPlaceDialog(
         confirmButton = {
             Button(onClick = {
                 coroutineScope.launch {
-                    imageUri?.let { uri ->
-                        imageUrl = uploadImageToStorage(uri, context)
-                    }
                     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                     val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                     val currentDate = Date()
@@ -482,8 +500,7 @@ fun ShowAddPlaceDialog(
     )
 }
 
-
-private fun createImageUri(context: Context): Uri? {
+/*private fun createImageUri(context: Context): Uri? {
     return try {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "temp_image_${System.currentTimeMillis()}.jpg")
@@ -495,6 +512,18 @@ private fun createImageUri(context: Context): Uri? {
         null
     }
 }
+
+private suspend fun uploadImageToStorage(uri: Uri, context: Context): String? {
+    return try {
+        val storageReference = FirebaseStorage.getInstance().reference.child("images/${UUID.randomUUID()}")
+        storageReference.putFile(uri).await()
+        storageReference.downloadUrl.await().toString()
+    } catch (e: Exception) {
+        Log.e("ImageUpload", "Failed to upload image to storage", e)
+        null
+    }
+}
+*/
 
 @Composable
 fun ShowAddResponseDialog(

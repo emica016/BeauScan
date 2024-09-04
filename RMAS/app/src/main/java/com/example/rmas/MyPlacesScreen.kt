@@ -2,16 +2,22 @@ package com.example.rmas
 
 import androidx.compose.ui.platform.LocalContext
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import coil.compose.AsyncImage
+import coil.compose.rememberImagePainter
 import com.example.rmas.data.Place
 import com.example.rmas.data.PlaceRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -51,12 +57,12 @@ fun MyPlacesScreen(navHostController: NavHostController, onPlaceClick: (String) 
                 Text("You haven't added any places yet.")
             }
         } else {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                places.forEach { place ->
+                items(places) { place ->
                     PlaceItem(place = place, onPlaceClick = {
                         onPlaceClick(place.id)
                     })
@@ -80,10 +86,13 @@ fun PlaceItem(place: Place, onPlaceClick: (String) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             place.imageUrl?.let { imageUrl ->
-                AsyncImage(
-                    model = imageUrl,
+                Image(
+                    painter = rememberImagePainter(data = imageUrl),
                     contentDescription = place.name,
-                    modifier = Modifier.size(80.dp)
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
                 )
             }
             Column {

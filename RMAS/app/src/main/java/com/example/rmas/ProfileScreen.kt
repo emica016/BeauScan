@@ -1,6 +1,5 @@
 package com.example.rmas
 
-import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,11 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.rmas.data.LocationInfo
 import com.example.rmas.database.FirebaseDatabase
 import com.example.rmas.database.FirebaseDatabase.getUser
 import com.example.rmas.ui.theme.RMASTheme
@@ -35,7 +33,6 @@ fun Profile(id: String) {
     var email by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var image by remember { mutableStateOf("") }
-    var isEditing by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -53,86 +50,60 @@ fun Profile(id: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .clip(RoundedCornerShape(16.dp))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground))
             .padding(16.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Profile Image
-        Surface(
+        // Profile Card
+        Card(
             modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(60.dp))
-                .border(BorderStroke(2.dp, Color(0xFFB5485D)), RoundedCornerShape(60.dp)),
-            color = Color.Gray
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            AsyncImage(
-                model = image,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = fullName,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // User Info
-        ProfileInfo(icon = Icons.Default.Person, info = username)
-        ProfileInfo(icon = Icons.Default.Email, info = email)
-        ProfileInfo(icon = Icons.Default.Phone, info = phoneNumber)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Location Service Toggle
-        if (FirebaseDatabase.getCurrentUser() == id) {
-            var location by remember { mutableStateOf(LocationInfo.locationServiceStatus) }
-
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .clip(RoundedCornerShape(8.dp))
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Profile Image
+                Surface(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(60.dp))
+                        .border(BorderStroke(4.dp, MaterialTheme.colorScheme.primary), RoundedCornerShape(60.dp)),
+                    color = Color.Gray
+                ) {
+                    AsyncImage(
+                        model = image,
+                        contentDescription = "Profile Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
-                    text = "Enable Location Service:",
-                    style = MaterialTheme.typography.bodyLarge
+                    text = fullName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
                 )
-                Checkbox(
-                    checked = location,
-                    onCheckedChange = {
-                        location = it
-                        if (location) {
-                            LocationInfo.enableLocation(context)
-                        } else {
-                            LocationInfo.disableLocation(context)
-                        }
-                    }
-                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // User Info
+                ProfileInfo(icon = Icons.Default.Person, info = username)
+                ProfileInfo(icon = Icons.Default.Email, info = email)
+                ProfileInfo(icon = Icons.Default.Phone, info = phoneNumber)
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Change Profile Image Button
-            Button(
-                onClick = { isEditing = !isEditing },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Change Profile Image")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -143,8 +114,8 @@ fun ProfileInfo(icon: ImageVector, info: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
