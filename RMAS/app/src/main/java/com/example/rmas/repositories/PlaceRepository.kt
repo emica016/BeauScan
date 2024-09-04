@@ -104,62 +104,127 @@ class PlaceRepository(private val context: Context) {
                 }
             }
     }
-
-    fun likeUserForPlace(id: String, userId: String) {
-        getPlace(id) { place ->
-            if (place != null) {
-                val ratingNum = place.ratingNum + 3
-                val rating = place.rating + 0.3
-                place.ratingNum = ratingNum
-                place.rating = rating
-
-                updateRatingForPlace(id, ratingNum, rating)
-
-                userCollection.document(userId).get().addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val user = task.result?.toObject(User::class.java)
-                        if (user != null) {
-                            user.points += 3
-                            updatePointsForUser(userId, user.points)
-                        } else {
-                            Log.d("PlaceRepository", "User not found")
-                        }
-                    } else {
-                        Log.d("PlaceRepository", "Error getting user: ${task.exception?.message}")
-                    }
-                }
-            } else {
-                Log.d("PlaceRepository", "Place not found")
-            }
+    suspend fun getUserIdByEmail(email: String): String? {
+        return try {
+            val querySnapshot = userCollection.whereEqualTo("email", email).get().await()
+            querySnapshot.documents.firstOrNull()?.id
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
-    fun dislikeUserForPlace(id: String, userId: String) {
-        getPlace(id) { place ->
-            if (place != null) {
-                val ratingNum = place.ratingNum - 2
-                val rating = place.rating - 0.2
-                place.ratingNum = ratingNum
-                place.rating = rating
 
-                updateRatingForPlace(id, ratingNum, rating)
+    fun updatePlaceRating(placeId: String, newRating: Float) {
+        val placeRef = db.collection("places").document(placeId)
 
-                userCollection.document(userId).get().addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        val user = task.result?.toObject(User::class.java)
-                        if (user != null) {
-                            user.points -= 2
-                            updatePointsForUser(userId, user.points)
+        placeRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                val place = document.toObject(Place::class.java)
+                place?.let {
+                    val currentRating = it.rating ?: 0.0
+                    val currentRatingNum = it.ratingNum ?: 0
+
+                    val newRatingNum = currentRatingNum + 1
+                    val newRatingSum = currentRating * currentRatingNum + newRating
+                    val newAverageRating = newRatingSum / newRatingNum
+
+                    placeRef.update(
+                        mapOf(
+                            "rating" to newAverageRating,
+                            "ratingNum" to newRatingNum
+                        )
+                    ).addOnSuccessListener {
+                        Log.d("PlaceRepository", "Rating updated successfully")
+                    }.addOnFailureListener { e ->
+                        Log.e("PlaceRepository", "Error updating rating", e)
+                    }
+                }
+            } else {
+                Log.e("PlaceRepository", "Document does not exist")
+            }
+        }.addOnFailureListener { e ->
+            Log.e("PlaceRepository", "Error fetching place", e)
+        }
+    }
+
+
+
+    fun likePlace(placeId: String) {
+        val placeRef = db.collection("places").document(placeId)
+        placeRef.update("likes", FieldValue.increment(1))
+    }
+
+    fun dislikePlace(placeId: String) {
+        val placeRef = db.collection("places").document(placeId)
+        placeRef.update("dislikes", FieldValue.increment(1))
+    }
+
+    suspend fun likeUserForPlace(placeId: String) {
+        val place = getPlaceById(placeId).await().toObject(Place::class.java)
+        if (place != null) {
+            val ratingNum = place.ratingNum + 3
+            val rating = place.rating + 0.3
+            place.ratingNum = ratingNum
+            place.rating = rating
+
+            updateRatingForPlace(placeId, ratingNum, rating)
+
+            val creatorEmail = place.creatorID
+            if (creatorEmail != null) {
+                if (creatorEmail.isNotBlank()) {
+                    val userId = creatorEmail?.let { getUserIdByEmail(it) }
+                    if (userId != null) {
+                        val userDoc = userCollection.document(userId).get().await().toObject(User::class.java)
+                        if (userDoc != null) {
+                            userDoc.points += 3
+                            updatePointsForUser(userId, userDoc.points)
                         } else {
                             Log.d("PlaceRepository", "User not found")
                         }
                     } else {
-                        Log.d("PlaceRepository", "Error getting user: ${task.exception?.message}")
+                        Log.d("PlaceRepository", "User ID not found")
                     }
+                } else {
+                    Log.d("PlaceRepository", "Creator email is blank")
                 }
-            } else {
-                Log.d("PlaceRepository", "Place not found")
             }
+        } else {
+            Log.d("PlaceRepository", "Place not found")
+        }
+    }
+
+    suspend fun dislikeUserForPlace(placeId: String) {
+        val place = getPlaceById(placeId).await().toObject(Place::class.java)
+        if (place != null) {
+            val ratingNum = place.ratingNum - 2
+            val rating = place.rating - 0.2
+            place.ratingNum = ratingNum
+            place.rating = rating
+
+            updateRatingForPlace(placeId, ratingNum, rating)
+
+            val creatorEmail = place.creatorID
+            if (creatorEmail != null) {
+                if (creatorEmail.isNotBlank()) {
+                    val userId = creatorEmail?.let { getUserIdByEmail(it) }
+                    if (userId != null) {
+                        val userDoc = userCollection.document(userId).get().await().toObject(User::class.java)
+                        if (userDoc != null) {
+                            userDoc.points -= 2
+                            updatePointsForUser(userId, userDoc.points)
+                        } else {
+                            Log.d("PlaceRepository", "User not found")
+                        }
+                    } else {
+                        Log.d("PlaceRepository", "User ID not found")
+                    }
+                } else {
+                    Log.d("PlaceRepository", "Creator email is blank")
+                }
+            }
+        } else {
+            Log.d("PlaceRepository", "Place not found")
         }
     }
 

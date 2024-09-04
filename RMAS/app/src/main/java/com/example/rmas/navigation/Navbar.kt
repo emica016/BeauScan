@@ -166,7 +166,7 @@ fun Navbar() {
                         requestId = requestId,
                         navHostController = navigationController,
                         onResponseClicked = { responseId ->
-                            navigationController.navigate("map_screen/$responseId")
+                            navigationController.navigate("map_screen/request/$requestId")
                         },
                         onPlaceRespond = { placeRespondId ->
                             navigationController.navigate("map_screen/$placeRespondId")
@@ -180,7 +180,7 @@ fun Navbar() {
                 MapScreen(requestId = null, placeId = null, placeRespond = placeRespondId, navHostController = navigationController)
             }
 
-            composable("map_screen/{requestId}") { backStackEntry ->
+            composable("map_screen/request/{requestId}") { backStackEntry ->
                 val requestId: String? = backStackEntry.arguments?.getString("requestId")
                 MapScreen(requestId = requestId, placeId = null, placeRespond = null, navHostController = navigationController)
             }

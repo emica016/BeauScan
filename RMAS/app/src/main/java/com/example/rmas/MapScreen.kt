@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -12,23 +13,29 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
-import coil.compose.AsyncImage
 import coil.compose.rememberImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberPermissionState
@@ -41,7 +48,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.GeoPoint
 import com.example.rmas.data.Place
 import com.example.rmas.data.PlaceRepository
-import com.example.rmas.data.Request
 import com.example.rmas.data.Response
 import com.example.rmas.services.uploadImageToStorage
 import com.google.accompanist.permissions.isGranted
@@ -49,10 +55,8 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -133,6 +137,8 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+
+
                 FilterChip(
                     selected = selectedType == null,
                     onClick = { selectedType = null },
@@ -234,8 +240,10 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
     }
 
     selectedPlaceId.value?.let { placeId ->
-        showPlaceDetails(placeId, placeRepository) {
-            selectedPlaceId.value = null
+        currentLocation.value?.let {
+            showPlaceDetails(placeId, placeRepository, it) {
+                selectedPlaceId.value = null
+            }
         }
     }
 }
@@ -289,11 +297,16 @@ fun ShowAddPlaceDialog(
 ) {
     var context = LocalContext.current
     var placeName by remember { mutableStateOf("") }
-    var placeType by remember { mutableStateOf("Frizerski salon") }
-    var placePurpose by remember { mutableStateOf("Usluga") }
+    val listOfTypes = listOf("Kozmeticki salon", "Frizerski salon", "Drogerija", "Parfimerija")
+    var type by remember { mutableStateOf(listOfTypes[0]) }
+
+    val listOfPurposes = listOf("Tretman", "Usluga", "Kupovina", "Uzorkovanje proizvoda")
+    var purpose by remember { mutableStateOf(listOfPurposes[0]) }
+    var expanded by remember { mutableStateOf(false) }
+    var expandedPur by remember { mutableStateOf(false) }
+
     var placeDescription by remember { mutableStateOf("") }
-    var expandedType by remember { mutableStateOf(false) }
-    var expandedPurpose by remember { mutableStateOf(false) }
+
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var imageUrl by remember { mutableStateOf<String?>(null) }
 
@@ -333,66 +346,64 @@ fun ShowAddPlaceDialog(
                     label = { Text("Naziv Mesta") }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-
                 ExposedDropdownMenuBox(
-                    expanded = expandedType,
-                    onExpandedChange = { expandedType = !expandedType }
-                ) {
+                    expanded = expanded ,
+                    onExpandedChange = {expanded = !expanded} )
+                {
                     OutlinedTextField(
-                        value = placeType,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        readOnly = false,
+                        value = type ,
                         onValueChange = {},
-                        label = { Text("Tip Mesta") },
-                        readOnly = true,
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType)
-                        },
-                        modifier = Modifier.fillMaxWidth()
+                        label = {Text("Tip")},
+                        trailingIcon = {ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded )},
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
-                        expanded = expandedType,
-                        onDismissRequest = { expandedType = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        listOf("Frizerski salon", "Kozmeticki salon", "Parfimerija", "Drogerija").forEach { type ->
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false}) {
+
+                        listOfTypes.forEach{ selectedOption ->
                             DropdownMenuItem(
-                                text = { Text(type) },
+                                text = { Text(selectedOption)},
                                 onClick = {
-                                    placeType = type
-                                    expandedType = false
-                                }
-                            )
+                                    type = selectedOption
+                                    expanded = false
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding)
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
 
                 ExposedDropdownMenuBox(
-                    expanded = expandedPurpose,
-                    onExpandedChange = { expandedPurpose = !expandedPurpose }
-                ) {
+                    expanded = expandedPur ,
+                    onExpandedChange = {expandedPur = !expandedPur} )
+                {
                     OutlinedTextField(
-                        value = placePurpose,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        readOnly = false,
+                        value = purpose ,
                         onValueChange = {},
-                        label = { Text("Svrha Mesta") },
-                        readOnly = true,
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPurpose)
-                        },
-                        modifier = Modifier.fillMaxWidth()
+                        label = {Text("Delatnost")},
+                        trailingIcon = {ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPur )},
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
-                        expanded = expandedPurpose,
-                        onDismissRequest = { expandedPurpose = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        listOf("Usluga", "Kupovina", "Tretman", "Uzorkovanje proizvoda").forEach { purpose ->
+                        expanded = expandedPur,
+                        onDismissRequest = { expandedPur = false}) {
+
+                        listOfPurposes.forEach{ selectedOptionPurpose ->
                             DropdownMenuItem(
-                                text = { Text(purpose) },
+                                text = { Text(selectedOptionPurpose)},
                                 onClick = {
-                                    placePurpose = purpose
-                                    expandedPurpose = false
-                                }
-                            )
+                                    purpose = selectedOptionPurpose
+                                    expandedPur = false
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding)
                         }
                     }
                 }
@@ -448,8 +459,8 @@ fun ShowAddPlaceDialog(
                         id = UUID.randomUUID().toString(),
                         name = placeName,
                         location = GeoPoint(latLng.latitude, latLng.longitude),
-                        type = placeType,
-                        purpose = placePurpose,
+                        type = type,
+                        purpose = purpose,
                         description = placeDescription,
                         creatorID = currentUser,
                         dateCreated = dateFormatter.format(currentDate),
@@ -540,52 +551,185 @@ fun ShowAddResponseDialog(
     )
 }
 
-
-
 @Composable
-private fun showPlaceDetails(placeId: String, placeRepository: PlaceRepository, onDismiss: () -> Unit) {
-    val place = remember { mutableStateOf<Place?>(null) }
+fun showPlaceDetails(
+    placeId: String,
+    placeRepository: PlaceRepository,
+    userLocation: LatLng, // Trenutna lokacija korisnika
+    onDismiss: () -> Unit
+) {
+    var place by remember { mutableStateOf<Place?>(null) }
+    var rating by remember { mutableStateOf(0f) }
+    var distance by remember { mutableStateOf(0f) } // Udaljenost u kilometrima
+    var snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(placeId) {
-        placeRepository.getPlace(placeId) { fetchedPlace ->
-            place.value = fetchedPlace
+        // Preuzmi informacije o mestu
+        val placeDocument = placeRepository.getPlaceById(placeId).await()
+        place = placeDocument.toObject(Place::class.java)
+
+        // Ako mesto postoji, izračunaj udaljenost
+        place?.let {
+            val placeLocation = LatLng(it.location.latitude, it.location.longitude)
+            distance = calculateDistance(userLocation, placeLocation)
+            rating = (it.rating ?: 0f).toFloat()
         }
     }
 
-    place.value?.let {
+    place?.let {
         AlertDialog(
-            onDismissRequest = { onDismiss() },
-            title = { Text(it.name) },
-            text = {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    it.imageUrl?.let { url ->
-                        AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(150.dp)
-                                .border(2.dp, Color.Gray, RectangleShape)
-                                .padding(4.dp),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                    Text("Tip: ${it.type}")
-                    Text("Svrha: ${it.purpose}")
-                    Text("Opis: ${it.description}")
-                    Text("Lokacija: ${it.location.latitude}, ${it.location.longitude}")
-                    Text("Kreator: ${it.creatorID}")
-                    Text("Datum Kreiranja: ${it.dateCreated}")
-                    Text("Vreme Kreiranja: ${it.timeCreated}")
-                }
+            onDismissRequest = onDismiss,
+            title = {
+                Text(text = "Detalji o Mestu", style = MaterialTheme.typography.titleLarge)
             },
             confirmButton = {
-                Button(onClick = { onDismiss() }) {
-                    Text("OK")
+                Button(onClick = onDismiss) {
+                    Text("Zatvori")
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    // Ime mesta
+                    Text(
+                        text = it.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Tip, svrha, opis
+                    Text(text = "Tip: ${it.type}", style = MaterialTheme.typography.bodyLarge)
+                    Text(text = "Svrha: ${it.purpose}", style = MaterialTheme.typography.bodyLarge)
+                    Text(text = "Opis: ${it.description}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Udaljenost
+                    Text(text = "Udaljenost: ${"%.2f".format(distance)} km", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Kreator
+                    Text(text = "Kreator: ${it.creatorID}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Lokacija
+                    Text(text = "Lokacija: ${it.location.latitude}, ${it.location.longitude}", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Slika mesta
+                    it.imageUrl?.let { imageUrl ->
+                        Image(
+                            painter = rememberImagePainter(data = imageUrl),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Prikaz ocene
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text(text = "Ocena: ", modifier = Modifier.padding(end = 8.dp))
+                        RatingBar(
+                            rating = rating,
+                            onRatingChanged = { newRating ->
+                                rating = newRating
+                                coroutineScope.launch {
+                                    placeRepository.updatePlaceRating(it.id, newRating)
+                                }
+                            }
+                        )
+                    }
+
+                    // Dugmad za Like i Dislike
+                    Row(
+                        modifier = Modifier.padding(top = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    placeRepository.likeUserForPlace(it.id)
+                                    placeRepository.likePlace(it.id)
+                                    snackbarHostState.showSnackbar("Mesto lajkovano")
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_thumb_up_24),
+                                contentDescription = "Like",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    placeRepository.dislikeUserForPlace(it.id)
+                                    placeRepository.dislikePlace(it.id)
+                                    snackbarHostState.showSnackbar("Mesto dislajkovano")
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.baseline_thumb_down_24),
+                                contentDescription = "Dislike",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             }
         )
+
+        // Prikaz Snackbara
+        SnackbarHost(hostState = snackbarHostState)
     }
+}
+
+@Composable
+fun RatingBar(
+    rating: Float,
+    onRatingChanged: (Float) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        for (i in 1..5) {
+            val icon: Painter = if (i <= rating) {
+                painterResource(id = R.drawable.baseline_star_24) // Use an image resource for filled star
+            } else {
+                painterResource(id = R.drawable.baseline_star_outline_24) // Use an image resource for outlined star
+            }
+
+            Icon(
+                painter = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onRatingChanged(i.toFloat()) }
+                    .padding(2.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+fun calculateDistance(location1: LatLng, location2: LatLng): Float {
+    val results = FloatArray(1)
+    Location.distanceBetween(
+        location1.latitude, location1.longitude,
+        location2.latitude, location2.longitude,
+        results
+    )
+    return results[0] / 1000 // Konvertuj iz metara u kilometre
 }
