@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Zahtevaj permisije za lokaciju
         ActivityCompat.requestPermissions(
             this,
             arrayOf(
@@ -33,12 +34,12 @@ class MainActivity : ComponentActivity() {
             0
         )
         requestBGLocationPermission()
-        val serviceIntent = Intent(this, LocationService::class.java)
-        startService(serviceIntent)
+
+        // Startuj LocationService sa akcijom za pronalaženje bliskih mesta
+        //startLocationService()
 
         setContent {
             RMASTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -50,7 +51,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
     private fun requestBGLocationPermission() {
         ActivityCompat.requestPermissions(
             this,
@@ -60,14 +60,16 @@ class MainActivity : ComponentActivity() {
             0
         )
     }
-}
 
-@RequiresApi(Build.VERSION_CODES.O)
-@Preview(showBackground = true)
-@Composable
-fun MainPreview() {
-   RMASTheme {
-        Navbar()
+    // Pokretanje LocationService-a sa ACTION_FIND_NEARBY akcijom
+    private fun startLocationService() {
+        val intent = Intent(this, LocationService::class.java).apply {
+            action = LocationService.ACTION_FIND_NEARBY
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
     }
 }
-

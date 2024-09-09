@@ -110,7 +110,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                 Button(
                     onClick = {
                         val intent = Intent(context, LocationService::class.java).apply {
-                            action = LocationService.ACTION_FIND_NEARBY
+                            action = LocationService.ACTION_START
                         }
                         ContextCompat.startForegroundService(context, intent)
                     },

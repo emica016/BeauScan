@@ -14,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.rmas.MainActivity
 import com.example.rmas.R
-import com.example.rmas.data.User
 import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,13 +24,16 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import kotlin.math.*
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class LocationService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var locationClient: LocationClient
     private lateinit var sharedPreferences: SharedPreferences
+    private val notifiedPlaces = mutableSetOf<String>()
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
@@ -55,7 +57,7 @@ class LocationService : Service() {
                 Log.d("LocationService", "Service started")
                 val notification = createNotification()
                 startForeground(NOTIFICATION_ID, notification)
-                start()
+                start(placeIsNearby = true)  // Pokreće pronalaženje bliskih mesta
             }
             ACTION_STOP -> {
                 Log.d("LocationService", "Service stopped")
@@ -65,7 +67,7 @@ class LocationService : Service() {
                 Log.d("LocationService", "Service started for nearby places")
                 val notification = createNotification()
                 startForeground(NOTIFICATION_ID, notification)
-                start(placeIsNearby = true)
+                start(placeIsNearby = true)  // Takođe pokreće pronalaženje bliskih mesta
             }
         }
         return START_NOT_STICKY
@@ -85,6 +87,8 @@ class LocationService : Service() {
                     putExtra(EXTRA_LOCATION_LONGITUDE, location.longitude)
                 }
                 LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
+
+                // Ako je postavljen flag za bliska mesta, proveri bliskost
                 if (placeIsNearby) {
                     checkProximityToPlaces(location.latitude, location.longitude)
                 }
@@ -162,13 +166,15 @@ class LocationService : Service() {
             .get()
             .addOnSuccessListener { documents ->
                 for (document in documents) {
-                    val placeLatitude = document.getDouble("latitude") ?: continue
-                    val placeLongitude = document.getDouble("longitude") ?: continue
+                    val geoPoint = document.getGeoPoint("location") ?: continue
+                    val placeLatitude = geoPoint.latitude
+                    val placeLongitude = geoPoint.longitude
                     val distance = calculateHaversineDistance(latitude, longitude, placeLatitude, placeLongitude)
 
-                    if (distance < PROXIMITY_RADIUS) {
+                    if (distance < PROXIMITY_RADIUS && !notifiedPlaces.contains(document.id)) {
                         Log.d("LocationService", "Nearby place found: ${document.id}")
                         sendProximityNotification(document.id, distance) // Notify user
+                        notifiedPlaces.add(document.id)
                     }
                 }
             }
@@ -200,12 +206,6 @@ class LocationService : Service() {
 
         notificationManager.notify(placeId.hashCode(), notification) // Unique ID for each place
     }
-
-
-
-
-
-
 
     companion object {
         const val ACTION_START = "com.example.rmas.action.START"

@@ -87,7 +87,8 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:4.4.1")
     implementation ("com.google.maps.android:android-maps-utils:0.5")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
-    implementation("com.google.android.gms:play-services-location:21.2.0")
+    implementation ("com.google.android.gms:play-services-location:21.0.1")
+
     implementation ("com.google.accompanist:accompanist-permissions:0.30.1")
 
     implementation ("androidx.compose.material3:material3:$(material3_version)")
