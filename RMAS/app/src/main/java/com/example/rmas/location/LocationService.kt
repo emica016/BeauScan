@@ -169,11 +169,12 @@ class LocationService : Service() {
                     val geoPoint = document.getGeoPoint("location") ?: continue
                     val placeLatitude = geoPoint.latitude
                     val placeLongitude = geoPoint.longitude
+                    val name = document.getString("name")?:continue
                     val distance = calculateHaversineDistance(latitude, longitude, placeLatitude, placeLongitude)
 
                     if (distance < PROXIMITY_RADIUS && !notifiedPlaces.contains(document.id)) {
                         Log.d("LocationService", "Nearby place found: ${document.id}")
-                        sendProximityNotification(document.id, distance) // Notify user
+                        sendProximityNotification(name, distance) // Notify user
                         notifiedPlaces.add(document.id)
                     }
                 }
