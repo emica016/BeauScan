@@ -61,6 +61,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -80,6 +81,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
     var selectedType by remember { mutableStateOf<String?>(null) }
     var showAddPlaceDialog by remember { mutableStateOf<Pair<LatLng, Boolean>?>(null) }
     var showAddResponseDialog by remember { mutableStateOf<Pair<Place, Boolean>?>(null) }
+    var selectedDate by remember { mutableStateOf("") } // Dodato polje za datum
 
     val mapProperties = remember { MapProperties(isMyLocationEnabled = true) }
     val mapUiSettings = remember { MapUiSettings(zoomControlsEnabled = true) }
@@ -89,7 +91,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
     LaunchedEffect(selectedType, radiusKm) {
         if (googleMap != null) {
-            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
+            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, selectedDate, placeRespond, currentLocation.value, radiusKm)
         }
     }
 
@@ -146,7 +148,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
                                 map.setOnMapLoadedCallback {
                                     coroutineScope.launch {
-                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
+                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, selectedDate,placeRespond, currentLocation.value, radiusKm)
                                     }
                                 }
                                 map.setOnMapClickListener { latLng ->
@@ -201,6 +203,24 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                 )
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ){
+                Button(
+                    onClick = {
+                        showDatePickerDialog(context) { date ->
+                            selectedDate = date
+                        }
+                    },
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text("Izaberi Datum")
+                }
+
+                Text("Izabrani datum: $selectedDate", modifier = Modifier.padding(8.dp))
+            }
             // Radius input and search/reset buttons
             Row(
                 modifier = Modifier
@@ -215,12 +235,14 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                     modifier = Modifier.weight(1f).padding(end = 4.dp)
                 )
 
+
                 Button(
                     onClick = {
                         selectedType = null
                         radiusKm = null
+                        selectedDate = null.toString()
                         coroutineScope.launch {
-                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
+                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, selectedDate, placeRespond, currentLocation.value, radiusKm)
                         }
                     },
                     modifier = Modifier.padding(start = 4.dp)
@@ -274,7 +296,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                 coroutineScope = coroutineScope,
                 onPlaceSaved = { place ->
                     coroutineScope.launch {
-                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
+                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, selectedDate,placeRespond, currentLocation.value, radiusKm)
                     }
                     showAddPlaceDialog = null
                     if (requestId != null) {
@@ -309,4 +331,17 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
             }
         }
     }
+}
+
+private fun showDatePickerDialog(context: Context, onDateSelected: (String) -> Unit) {
+    val calendar = Calendar.getInstance()
+    val year = calendar.get(Calendar.YEAR)
+    val month = calendar.get(Calendar.MONTH)
+    val day = calendar.get(Calendar.DAY_OF_MONTH)
+
+    android.app.DatePickerDialog(context, { _, selectedYear, selectedMonth, selectedDay ->
+        val formattedDate =
+            String.format("%02d/%02d/%04d", selectedDay, selectedMonth + 1, selectedYear)
+        onDateSelected(formattedDate)
+    }, year, month, day).show()
 }

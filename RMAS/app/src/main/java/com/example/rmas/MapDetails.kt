@@ -84,9 +84,10 @@ fun fetchPlaces(
     googleMap: GoogleMap?,
     placeId: String?,
     selectedType: String?,
+    selectedDate: String?, // Novi parametar za datum
     placeRespond: String?,
     userLocation: LatLng?,
-    radiusKm: Double? // New radius parameter
+    radiusKm: Double? // Novi radius parametar
 ) {
     placeRepository.getAllPlaces().get().addOnSuccessListener { result ->
         places.clear()
@@ -97,22 +98,26 @@ fun fetchPlaces(
             val place = document.toObject(Place::class.java)
 
             val placeLatLng = LatLng(place.location.latitude, place.location.longitude)
-            // Calculate the distance if userLocation and radius are provided
+            // Izračunaj razdaljinu ako su userLocation i radius dostupni
             val withinRadius = if (userLocation != null && radiusKm != null) {
                 val distance = calculateDistance(userLocation, placeLatLng)
                 distance <= radiusKm
             } else true
 
-            if (withinRadius && (selectedType == null || place.type == selectedType)) {
+            // Filtriranje po datumu
+            val matchesDate = selectedDate == null || place.dateCreated <= selectedDate // Proverava da li je datum mesta manji ili jednak izabranom datumu
+
+            // Filtriraj mesta
+            if (withinRadius && matchesDate && (selectedType == null || place.type == selectedType)) {
                 places.add(place)
                 val markerOptions = MarkerOptions()
                     .position(placeLatLng)
                     .title(place.name)
                     .icon(
                         if (place.id == placeId || (placeRespond != null && place.id == placeRespond)) {
-                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN) // Green for selected place
+                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN) // Zeleni za izabrano mesto
                         } else {
-                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Default for others
+                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Podrazumevano za ostala
                         }
                     )
 
@@ -122,6 +127,7 @@ fun fetchPlaces(
         }
     }
 }
+
 
 fun calculateDistance(userLocation: LatLng, placeLocation: LatLng): Double {
     val earthRadiusKm = 6371.0
