@@ -84,7 +84,9 @@ fun fetchPlaces(
     googleMap: GoogleMap?,
     placeId: String?,
     selectedType: String?,
-    placeRespond: String?
+    placeRespond: String?,
+    userLocation: LatLng?,
+    radiusKm: Double? // New radius parameter
 ) {
     placeRepository.getAllPlaces().get().addOnSuccessListener { result ->
         places.clear()
@@ -93,19 +95,25 @@ fun fetchPlaces(
 
         for (document in result) {
             val place = document.toObject(Place::class.java)
-            if (selectedType == null || place.type == selectedType) {
+
+            val placeLatLng = LatLng(place.location.latitude, place.location.longitude)
+            // Calculate the distance if userLocation and radius are provided
+            val withinRadius = if (userLocation != null && radiusKm != null) {
+                val distance = calculateDistance(userLocation, placeLatLng)
+                distance <= radiusKm
+            } else true
+
+            if (withinRadius && (selectedType == null || place.type == selectedType)) {
                 places.add(place)
-                val position = LatLng(place.location.latitude, place.location.longitude)
                 val markerOptions = MarkerOptions()
-                    .position(position)
+                    .position(placeLatLng)
                     .title(place.name)
                     .icon(
-                        if (place.id == placeId || (placeRespond!= null && place.id == placeRespond )) {
+                        if (place.id == placeId || (placeRespond != null && place.id == placeRespond)) {
                             BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN) // Green for selected place
                         } else {
-                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Default color for other places
+                            BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) // Default for others
                         }
-
                     )
 
                 val marker = googleMap?.addMarker(markerOptions)
@@ -113,6 +121,17 @@ fun fetchPlaces(
             }
         }
     }
+}
+
+fun calculateDistance(userLocation: LatLng, placeLocation: LatLng): Double {
+    val earthRadiusKm = 6371.0
+    val dLat = Math.toRadians(placeLocation.latitude - userLocation.latitude)
+    val dLng = Math.toRadians(placeLocation.longitude - userLocation.longitude)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(userLocation.latitude)) * Math.cos(Math.toRadians(placeLocation.latitude)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return earthRadiusKm * c
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -392,7 +411,7 @@ fun showPlaceDetails(
         // Ako mesto postoji, izračunaj udaljenost
         place?.let {
             val placeLocation = LatLng(it.location.latitude, it.location.longitude)
-            distance = calculateDistance(userLocation, placeLocation)
+            distance = calculateDistance(userLocation, placeLocation).toFloat()
             rating = (it.rating ?: 0f).toFloat()
         }
     }
@@ -542,14 +561,4 @@ fun RatingBar(
             )
         }
     }
-}
-
-fun calculateDistance(location1: LatLng, location2: LatLng): Float {
-    val results = FloatArray(1)
-    Location.distanceBetween(
-        location1.latitude, location1.longitude,
-        location2.latitude, location2.longitude,
-        results
-    )
-    return results[0] / 1000 // Konvertuj iz metara u kilometre
 }

@@ -85,11 +85,11 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
     val mapUiSettings = remember { MapUiSettings(zoomControlsEnabled = true) }
 
     var currentLocationMarker by remember { mutableStateOf<Marker?>(null) }
+    var radiusKm by remember { mutableStateOf<Double?>(null) }
 
-
-    LaunchedEffect(selectedType) {
+    LaunchedEffect(selectedType, radiusKm) {
         if (googleMap != null) {
-            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
+            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
         }
     }
 
@@ -101,6 +101,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
     if (locationPermissionState.status.isGranted) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Service control buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -145,7 +146,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
 
                                 map.setOnMapLoadedCallback {
                                     coroutineScope.launch {
-                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
+                                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
                                     }
                                 }
                                 map.setOnMapClickListener { latLng ->
@@ -173,11 +174,9 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
-
                 FilterChip(
                     selected = selectedType == null,
-                    onClick = { selectedType = null },
+                    onClick = { selectedType = null; radiusKm = null },
                     label = { Text("Svi Tipovi") }
                 )
                 FilterChip(
@@ -202,7 +201,33 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                 )
             }
 
+            // Radius input and search/reset buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OutlinedTextField(
+                    value = radiusKm?.toString() ?: "",
+                    onValueChange = { radiusKm = it.toDoubleOrNull() },
+                    label = { Text("Unesi radijus (km)") },
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                )
 
+                Button(
+                    onClick = {
+                        selectedType = null
+                        radiusKm = null
+                        coroutineScope.launch {
+                            fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
+                        }
+                    },
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    Text("Resetuj Filtere")
+                }
+            }
         }
 
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -249,7 +274,7 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
                 coroutineScope = coroutineScope,
                 onPlaceSaved = { place ->
                     coroutineScope.launch {
-                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond)
+                        fetchPlaces(placeRepository, places, placeMarkers, googleMap, placeId, selectedType, placeRespond, currentLocation.value, radiusKm)
                     }
                     showAddPlaceDialog = null
                     if (requestId != null) {
@@ -285,4 +310,3 @@ fun MapScreen(requestId: String?, placeId: String?, placeRespond: String?, navHo
         }
     }
 }
-
