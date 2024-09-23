@@ -9,8 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,21 +31,45 @@ fun LeaderboardScreen(navController: NavHostController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color(0xFFE0E7FF)) // Change to your preferred background color
     ) {
+        Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = "Leaderboard",
+                style = TextStyle(
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            )
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+            contentColor = Color.White,
+            modifier = Modifier.padding(8.dp)
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
-                    text = { Text(title) }
+                    text = { Text(title) },
+                    modifier = Modifier
+                        .padding(vertical = 4.dp)
+                        .background(
+                            if (selectedTab == index) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                            else Color.Transparent
+                        )
+                        .clip(MaterialTheme.shapes.small)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp)) // Added space between tab row and content
+
         when (selectedTab) {
             0 -> UserLeaderboardTab()
             1 -> PlaceLeaderboardTab()
@@ -93,12 +119,26 @@ fun UserLeaderboardItem(user: User, requestCount: Int, responseCount: Int, rank:
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        val medalResId = when (rank) {
+            1 -> R.drawable.gold_medal
+            2 -> R.drawable.silver_medal
+            3 -> R.drawable.bronze_medal
+            else -> null
+        }
+
+        medalResId?.let {
+            Image(
+                painter = rememberAsyncImagePainter(it),
+                contentDescription = "Medal",
+                modifier = Modifier.size(30.dp)
+            )
+        } ?: Text(
             text = "$rank.",
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
             modifier = Modifier.width(40.dp)
         )
+
         Spacer(modifier = Modifier.width(10.dp))
         Image(
             painter = rememberAsyncImagePainter(user.image),
@@ -130,7 +170,13 @@ fun UserLeaderboardItem(user: User, requestCount: Int, responseCount: Int, rank:
             )
         }
     }
-    Divider(color = Color.LightGray, thickness = 1.dp)
+    // Custom divider
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)) // Customize color and transparency
+    )
 }
 
 @Composable
@@ -164,12 +210,26 @@ fun PlaceLeaderboardItem(place: Place, rank: Int) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        val medalResId = when (rank) {
+            1 -> R.drawable.gold_medal
+            2 -> R.drawable.silver_medal
+            3 -> R.drawable.bronze_medal
+            else -> null
+        }
+
+        medalResId?.let {
+            Image(
+                painter = rememberAsyncImagePainter(it),
+                contentDescription = "Medal",
+                modifier = Modifier.size(30.dp)
+            )
+        } ?: Text(
             text = "$rank.",
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
             modifier = Modifier.width(40.dp)
         )
+
         Spacer(modifier = Modifier.width(10.dp))
         place.imageUrl?.let {
             Image(
@@ -207,5 +267,11 @@ fun PlaceLeaderboardItem(place: Place, rank: Int) {
             )
         }
     }
-    Divider(color = Color.LightGray, thickness = 1.dp)
+    // Custom divider
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)) // Customize color and transparency
+    )
 }
