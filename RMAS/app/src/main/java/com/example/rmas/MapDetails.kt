@@ -105,7 +105,7 @@ fun fetchPlaces(
             } else true
 
             // Filtriranje po datumu
-            val matchesDate = selectedDate == null || place.dateCreated <= selectedDate // Proverava da li je datum mesta manji ili jednak izabranom datumu
+            val matchesDate = selectedDate == null || selectedDate == ""|| place.dateCreated <= selectedDate // Proverava da li je datum mesta manji ili jednak izabranom datumu
 
             // Filtriraj mesta
             if (withinRadius && matchesDate && (selectedType == null || place.type == selectedType)) {
@@ -259,19 +259,19 @@ fun ShowAddPlaceDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Display Image if selected
                 imageUri?.let {
                     Image(
                         painter = rememberImagePainter(it),
                         contentDescription = null,
                         modifier = Modifier
                             .size(150.dp)
-                            .border(2.dp, Color.Gray, RectangleShape)
+                            .border(2.dp, Color.Gray)
                             .padding(4.dp),
                         contentScale = ContentScale.Crop
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-
                 Row {
                     Button(onClick = { cameraService.takePicture() }) {
                         Text("Snimite sliku")
@@ -296,7 +296,7 @@ fun ShowAddPlaceDialog(
                         type = type,
                         purpose = purpose,
                         description = placeDescription,
-                        creatorID = currentUser,
+                        creatorID = FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous",
                         dateCreated = dateFormatter.format(currentDate),
                         timeCreated = timeFormatter.format(currentDate),
                         imageUrl = imageUrl
@@ -315,6 +315,7 @@ fun ShowAddPlaceDialog(
         }
     )
 }
+
 
 /*private fun createImageUri(context: Context): Uri? {
     return try {
@@ -465,10 +466,18 @@ fun showPlaceDetails(
                     Text(text = "Lokacija: ${it.location.latitude}, ${it.location.longitude}", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Slika mesta
+
+                    // Slika mesta sa placeholder i error handling
                     it.imageUrl?.let { imageUrl ->
                         Image(
-                            painter = rememberImagePainter(data = imageUrl),
+                            painter = rememberImagePainter(
+                                data = imageUrl,
+                                builder = {
+                                    crossfade(true)
+                                    placeholder(R.drawable.placeholder_image) // Placeholder dok se slika učitava
+                                    error(R.drawable.error_image) // Error slika u slučaju greške
+                                }
+                            ),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
